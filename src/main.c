@@ -10,6 +10,7 @@ int main(int argc, char** argv)
     int n_records = 0;
     struct PointBuffer points = pointbuffer_create(100);
     if (points.size < 0) {
+        free(points.points);
         return 1;
     }
 
@@ -47,7 +48,9 @@ int main(int argc, char** argv)
         printf("ERROR: tree building failed\n");
         return 1;
     }
+
     balltree_print(tree);
+
     balltree_free(tree);
     return 0;
 }
