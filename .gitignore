@@ -1,3 +1,7 @@
+# local setup
+.vscode
+testing
+
 # Prerequisites
 *.d
 
