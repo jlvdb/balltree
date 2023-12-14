@@ -11,9 +11,14 @@ struct BallTree {
     struct PointBuffer data;
 };
 
-int balltree_is_leaf(const struct BallTree *node);
-void balltree_print(const struct BallTree *node);
-struct BallTree* balltree_build(struct PointSlice *points, int leafsize);
-void balltree_free(struct BallTree *node);
+int balltree_is_leaf(const struct BallTree*);
+void balltree_print(const struct BallTree*);
+struct BallTree* balltree_build(struct PointSlice*, int);
+void balltree_free(struct BallTree*);
+double balltree_count_radius(struct BallTree*, struct Point*, double);
+double balltree_query_range(struct BallTree*, struct Point*, double, double);
+//
+double count_within_radius(struct PointBuffer*, struct Point*, double);
+
 
 #endif /* BALLTREE_H */

@@ -150,3 +150,73 @@ void balltree_free(struct BallTree *node)
     free(node);
     node = NULL;
 }
+
+double count_within_radius(struct PointBuffer *buffer, struct Point *point, double radius) {
+    double radius2 = radius * radius;
+    double count = 0.0;
+
+    struct Point *points = buffer->points;
+    for (size_t i = 0; i < buffer->size; i++) {
+        double distance2 = points_distance2(&points[i], point);
+        if (distance2 <= radius2) {
+            count += 1.0;  // we want weights later
+        }
+    }
+    return count;
+}
+
+double balltree_count_radius(struct BallTree *node, struct Point *point, double radius) {
+    double counts = 0.0;
+    double distance = points_distance(&node->center, point);
+    double node_radius = node->radius;
+
+    if (balltree_is_leaf(node)) {
+        if (distance <= radius - node_radius) {
+            counts += (double)node->data.size;  // we want weights later
+        } else if (distance <= radius + node_radius) {
+            counts += count_within_radius(&node->data, point, radius);
+        }
+    } else {
+        counts += balltree_count_radius(node->left, point, radius);
+        counts += balltree_count_radius(node->right, point, radius);
+    }
+    return counts;
+}
+
+double count_within_range(struct PointBuffer *buffer, struct Point *point, double rmin, double rmax) {
+    double rmin2 = rmin * rmin;
+    double rmax2 = rmax * rmax;
+    double count = 0.0;
+
+    struct Point *points = buffer->points;
+    for (size_t i = 0; i < buffer->size; i++) {
+        double distance2 = points_distance2(&points[i], point);
+        if (rmin2 < distance2 && distance2 <= rmax2) {
+            count += 1.0;  // we want weights later
+        }
+    }
+    return count;
+}
+
+double balltree_query_range(struct BallTree *node, struct Point *point, double rmin, double rmax) {
+    double counts = 0.0;
+    double distance = points_distance(&node->center, point);
+    double node_radius = node->radius;
+
+    if (balltree_is_leaf(node)) {
+        if (rmin + node_radius < distance && distance <= rmax - node_radius) {
+            counts += (double)node->data.size;  // we want weights later
+        } else if (rmin - node_radius < distance || distance <= rmax + node_radius) {
+            counts += count_within_range(&node->data, point, rmin, rmax);
+        }
+    } else {
+        // traverse
+        if (node->left) {
+            counts += balltree_query_range(node->left, point, rmin, rmax);
+        }
+        if (node->right) {
+            counts += balltree_query_range(node->right, point, rmin, rmax);
+        }
+    }
+    return counts;
+}

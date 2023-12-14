@@ -60,20 +60,34 @@ int main(int argc, char** argv)
 
     // build the tree and print it
     start_time = clock();
-    int leafsize = 40;
+    int leafsize = 1000;
     struct PointSlice slice = pointslice_from_buffer(points);
     struct BallTree *tree = balltree_build(&slice, leafsize);
-    free(points.points);
     if (!tree) {
         perror("tree building failed");
+        free(points.points);
         return 1;
     }
     end_time = clock();
     difftime = (double)(end_time - start_time) / CLOCKS_PER_SEC;
     printf("built tree in %.3lf sec\n", difftime);
 
-    // balltree_print(tree);
+    struct Point qpoint = {0.0, 0.0, 0.0};
+    double radius = 1.2;
+
+    start_time = clock();
+    double count = balltree_count_radius(tree, &qpoint, radius);
+    end_time = clock();
+    difftime = (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0;
+    printf("found %.0lf pairs in %.3lf ms\n", count, difftime);
+
+    start_time = clock();
+    count = count_within_radius(&points, &qpoint, radius);
+    end_time = clock();
+    difftime = (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0;
+    printf("brute %.0lf pairs in %.3lf ms\n", count, difftime);
 
     balltree_free(tree);
+    free(points.points);
     return 0;
 }

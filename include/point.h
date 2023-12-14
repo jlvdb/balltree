@@ -22,19 +22,20 @@ struct PointSlice {
     struct Point *points;
 };
 
-void print_point(const struct Point *point);
-double points_distance(const struct Point *p1, const struct Point *p2);
+void print_point(const struct Point*);
+double points_distance(const struct Point*, const struct Point*);
+double points_distance2(const struct Point*, const struct Point*);
 
-struct PointBuffer pointbuffer_create(int size);
-int pointbuffer_resize(struct PointBuffer *buffer, int newsize);
+struct PointBuffer pointbuffer_create(int);
+int pointbuffer_resize(struct PointBuffer*, int);
 
-struct PointSlice pointslice_from_buffer(const struct PointBuffer buffer);
-void print_pointslice(const struct PointSlice *slice);
-size_t get_pointslice_size(const struct PointSlice *slice);
-struct Point get_center_point(const struct PointSlice *slice);
-double get_maxdist_from_center(const struct PointSlice *slice, struct Point center);
-enum Axis get_max_spread_axis(const struct PointSlice *slice);
-int partial_median_sort(struct PointSlice *slice, enum Axis axis);
+struct PointSlice pointslice_from_buffer(const struct PointBuffer);
+void print_pointslice(const struct PointSlice*);
+size_t get_pointslice_size(const struct PointSlice*);
+struct Point get_center_point(const struct PointSlice*);
+double get_maxdist_from_center(const struct PointSlice*, struct Point);
+enum Axis get_max_spread_axis(const struct PointSlice*);
+int partial_median_sort(struct PointSlice*, enum Axis);
 
 
 #endif /* POINT_H */
