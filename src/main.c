@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <time.h>
+#include <locale.h>
 
 #include "point.h"
 #include "balltree.h"
@@ -6,6 +8,10 @@
 
 int main(int argc, char** argv)
 {
+    clock_t start_time, end_time;
+    double difftime;
+    setlocale(LC_NUMERIC, "");
+
     double xi, yi, zi;
     int n_records = 0;
     struct PointBuffer points = pointbuffer_create(100);
@@ -15,6 +21,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    start_time = clock();
     FILE *file = fopen("testing/points.txt", "r");
     if (file == NULL) {
         perror("failed to open file");
@@ -47,17 +54,25 @@ int main(int argc, char** argv)
         free(points.points);
         return 1;
     }
+    end_time = clock();
+    difftime = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+    printf("read %'d records in %.3lf sec\n", n_records, difftime);
 
     // build the tree and print it
+    start_time = clock();
+    int leafsize = 40;
     struct PointSlice slice = pointslice_from_buffer(points);
-    struct BallTree *tree = balltree_build(&slice, 6);
+    struct BallTree *tree = balltree_build(&slice, leafsize);
     free(points.points);
     if (!tree) {
         perror("tree building failed");
         return 1;
     }
+    end_time = clock();
+    difftime = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+    printf("built tree in %.3lf sec\n", difftime);
 
-    balltree_print(tree);
+    // balltree_print(tree);
 
     balltree_free(tree);
     return 0;
