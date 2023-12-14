@@ -4,8 +4,12 @@
 
 #include "point.h"
 
+#define SUCCESS 1
+#define FAILED  0
+
 #define POINT_ACCESS_BY_INDEX(ptr, index) (*((double*)((char*)(ptr) + (index) * sizeof(double))))
 #define SWAP(temp, a, b) do { (temp) = (a); (a) = (b); (b) = (temp); } while (0)
+#define eprintf(str) fprintf (stderr, "ERROR: %s\n", str)
 
 void print_point(const struct Point *point)
 {
@@ -31,6 +35,42 @@ double points_distance2(const struct Point *p1, const struct Point *p2)
 double points_distance(const struct Point *p1, const struct Point *p2)
 {
     return sqrt(points_distance2(p1, p2));
+}
+
+struct PointBuffer pointbuffer_create(int size)
+{
+    size_t n_bytes = size * sizeof(struct Point);
+
+    struct PointBuffer buffer;
+    buffer.points = (struct Point*)malloc(n_bytes);
+    if (!buffer.points) {
+        eprintf("memory allocation failed");
+        buffer.size = -1;
+    } else {
+        buffer.size = size;
+    }
+    return buffer;
+}
+
+int pointbuffer_resize(struct PointBuffer *buffer, int newsize)
+{
+    struct Point *points = (struct Point*)realloc(buffer->points, newsize * sizeof(struct Point));
+    if (!points) {
+        return FAILED;
+    }
+    buffer->size = newsize;
+    buffer->points = points;
+    return SUCCESS;
+}
+
+struct PointSlice pointslice_from_buffer(const struct PointBuffer buffer)
+{
+    struct PointSlice slice = {
+        .start = 0,
+        .end = buffer.size,
+        .points = buffer.points,
+    };
+    return slice;
 }
 
 void print_pointslice(const struct PointSlice *slice)

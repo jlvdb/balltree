@@ -13,7 +13,7 @@ struct BallTree {
 
 int balltree_is_leaf(const struct BallTree *node);
 void balltree_print(const struct BallTree *node);
-struct BallTree *balltree_build(struct PointSlice *points, int leafsize);
+struct BallTree* balltree_build(struct PointSlice *points, int leafsize);
 void balltree_free(struct BallTree *node);
 
 #endif /* BALLTREE_H */

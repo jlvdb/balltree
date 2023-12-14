@@ -10,7 +10,7 @@
 
 #define eprintf(str) fprintf (stderr, "ERROR: %s\n", str)
 
-struct BallTree *balltree_create_node(struct Point center, double radius)
+struct BallTree* balltree_create_node(struct Point center, double radius)
 {
     struct BallTree *node = (struct BallTree*)calloc(1, sizeof(struct BallTree));
     if (!node) {
@@ -22,7 +22,7 @@ struct BallTree *balltree_create_node(struct Point center, double radius)
     return node;
 }
 
-struct BallTree *balltree_create_leaf(struct Point center, double radius, const struct PointSlice *slice)
+struct BallTree* balltree_create_leaf(struct Point center, double radius, const struct PointSlice *slice)
 {
     size_t size = get_pointslice_size(slice);
     size_t n_bytes = size * sizeof(struct Point);
@@ -79,7 +79,7 @@ void balltree_print(const struct BallTree *node)
     balltree_print_indented(node, 0);
 }
 
-struct BallTree *create_child(struct PointSlice *parent, int leafsize, size_t split_index, int left)
+struct BallTree* create_child(struct PointSlice *parent, int leafsize, size_t split_index, int left)
 {
     struct PointSlice child;
     child.points = parent->points;
@@ -113,7 +113,7 @@ void attach_childs(struct BallTree *node, struct PointSlice *points, int leafsiz
     }
 }
 
-struct BallTree *balltree_build(struct PointSlice *points, int leafsize)
+struct BallTree* balltree_build(struct PointSlice *points, int leafsize)
 {
     size_t size = get_pointslice_size(points);
     if (size < 1) {
