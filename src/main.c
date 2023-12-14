@@ -6,29 +6,43 @@
 
 int main(int argc, char** argv)
 {
-    const int N = 12;
-    struct Point points[N] = {
-        {1.1, 2.1, 3.1},
-        {4.1, 5.1, 6.1},
-        {7.1, 8.1, 9.1},
-        {10.1, 11.1, 12.1},
+    double xi, yi, zi;
+    int n_records = 0;
+    struct PointBuffer points = pointbuffer_create(100);
+    if (points.size < 0) {
+        return 1;
+    }
 
-        {1.2, 2.2, 3.2},
-        {4.2, 5.2, 6.2},
-        {7.2, 8.2, 9.2},
-        {10.2, 11.2, 12.2},
+    FILE *file = fopen("testing/points.txt", "r");
+    if (file == NULL) {
+        perror("Error opening file");
+        free(points.points);
+        return 1;
+    }
+    // load the data from file while dynamically growing the point buffer
+    while (fscanf(file, "%lf %lf %lf", &xi, &yi, &zi) == 3) {
+        if (n_records == points.size) {
+            if (!pointbuffer_resize(&points, points.size * 2)) {
+                free(points.points);
+                fclose(file);
+                return 1;
+            }
+        }
+        struct Point point = {xi, yi, zi};
+        points.points[n_records] = point;
+        n_records++;
+    }
+    fclose(file);
+    // truncate the buffer to the actual size
+    if (!pointbuffer_resize(&points, n_records)) {
+        free(points.points);
+        return 1;
+    }
 
-        {1.3, 2.3, 3.3},
-        {4.3, 5.3, 6.3},
-        {7.3, 8.3, 9.3},
-        {10.3, 11.3, 12.3},
-    };
-    struct PointSlice slice = {
-        .start = 0,
-        .end = N,
-        .points = points,
-    };
+    // build the tree and print it
+    struct PointSlice slice = pointslice_from_buffer(points);
     struct BallTree *tree = balltree_build(&slice, 6);
+    free(points.points);
     if (!tree) {
         printf("ERROR: tree building failed\n");
         return 1;
