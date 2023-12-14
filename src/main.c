@@ -10,13 +10,14 @@ int main(int argc, char** argv)
     int n_records = 0;
     struct PointBuffer points = pointbuffer_create(100);
     if (points.size < 0) {
+        perror("memory allocation failed");
         free(points.points);
         return 1;
     }
 
     FILE *file = fopen("testing/points.txt", "r");
     if (file == NULL) {
-        perror("Error opening file");
+        perror("failed to open file");
         free(points.points);
         return 1;
     }
@@ -24,6 +25,7 @@ int main(int argc, char** argv)
     while (fscanf(file, "%lf %lf %lf", &xi, &yi, &zi) == 3) {
         if (n_records == points.size) {
             if (!pointbuffer_resize(&points, points.size * 2)) {
+                perror("memory allocation failed");
                 free(points.points);
                 fclose(file);
                 return 1;
@@ -35,7 +37,13 @@ int main(int argc, char** argv)
     }
     fclose(file);
     // truncate the buffer to the actual size
+    if (n_records == 0) {
+        perror("did not read any records from file");
+        free(points.points);
+        return 1;
+    }
     if (!pointbuffer_resize(&points, n_records)) {
+        perror("memory reallocation failed");
         free(points.points);
         return 1;
     }
@@ -45,7 +53,7 @@ int main(int argc, char** argv)
     struct BallTree *tree = balltree_build(&slice, 6);
     free(points.points);
     if (!tree) {
-        printf("ERROR: tree building failed\n");
+        perror("tree building failed");
         return 1;
     }
 

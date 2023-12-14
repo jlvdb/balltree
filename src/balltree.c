@@ -8,13 +8,11 @@
 #define TRUE  1
 #define FALSE 0
 
-#define eprintf(str) fprintf (stderr, "ERROR: %s\n", str)
-
 struct BallTree* balltree_create_node(struct Point center, double radius)
 {
     struct BallTree *node = (struct BallTree*)calloc(1, sizeof(struct BallTree));
     if (!node) {
-        eprintf("BallTree node allocation failed");
+        perror("BallTree node allocation failed");
         return NULL;
     }
     node->center = center;
@@ -34,7 +32,7 @@ struct BallTree* balltree_create_leaf(struct Point center, double radius, const 
     node->data.size = size;
     node->data.points = (struct Point*)malloc(n_bytes);
     if (!node->data.points) {
-        eprintf("BallTree leaf data allocation failed");
+        perror("BallTree leaf data allocation failed");
         return NULL;
     }
     memcpy(node->data.points, slice->points, n_bytes);
@@ -98,7 +96,7 @@ void attach_childs(struct BallTree *node, struct PointSlice *points, int leafsiz
     enum Axis split_axis = get_max_spread_axis(points);
     int i_split = partial_median_sort(points, split_axis);
     if (i_split == -1) {
-        eprintf("could not determine the median element for the next split");
+        perror("could not determine the median element for the next split");
         print_pointslice(points);
         return;
     }

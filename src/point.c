@@ -9,7 +9,6 @@
 
 #define POINT_ACCESS_BY_INDEX(ptr, index) (*((double*)((char*)(ptr) + (index) * sizeof(double))))
 #define SWAP(temp, a, b) do { (temp) = (a); (a) = (b); (b) = (temp); } while (0)
-#define eprintf(str) fprintf (stderr, "ERROR: %s\n", str)
 
 void print_point(const struct Point *point)
 {
@@ -44,7 +43,7 @@ struct PointBuffer pointbuffer_create(int size)
     struct PointBuffer buffer;
     buffer.points = (struct Point*)malloc(n_bytes);
     if (!buffer.points) {
-        eprintf("memory allocation failed");
+        perror("memory allocation failed");
         buffer.size = -1;
     } else {
         buffer.size = size;
