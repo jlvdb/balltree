@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Iinclude -Wall
+CFLAGS = -Iinclude -Wall -O
 SRCDIR = src
 BUILDDIR = build
 BINDIR = bin
@@ -7,7 +7,7 @@ BINDIR = bin
 SRCS = $(wildcard $(SRCDIR)/*.c)
 OBJS = $(patsubst $(SRCDIR)/%.c, $(BUILDDIR)/%.o, $(SRCS))
 
-TARGET = $(BINDIR)/main
+TARGET = $(BINDIR)/main.out
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@
