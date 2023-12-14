@@ -33,6 +33,16 @@ double points_distance(const struct Point *p1, const struct Point *p2)
     return sqrt(points_distance2(p1, p2));
 }
 
+void print_pointslice(const struct PointSlice *slice)
+{
+    printf("{\n");
+    for (size_t i = slice->start; i < slice->end; i++) {
+        printf("    ");
+        print_point(&slice->points[i]);
+    }
+    printf("}\n");
+}
+
 size_t get_pointslice_size(const struct PointSlice *slice)
 {
     return slice->end - slice->start;
@@ -68,8 +78,9 @@ double get_maxdist_from_center(const struct PointSlice *slice, struct Point cent
     struct Point *points = slice->points;
     for (size_t i = slice->start; i < slice->end; i++) {
         double points_distance = points_distance2(&points[i], &center);
-        if (points_distance > maxdist)
+        if (points_distance > maxdist) {
             maxdist = points_distance;
+        }
     }
     return sqrt(maxdist);
 }
@@ -89,34 +100,36 @@ enum Axis get_max_spread_axis(const struct PointSlice *slice)
         struct Point point = points[i];
 
         xi = point.x;
-        if (xi < x_min)
+        if (xi < x_min) {
             x_min = xi;
-        else if (xi > x_max)
+        } else if (xi > x_max) {
             x_max = xi;
-
+        }
         yi = point.y;
-        if (yi < y_min)
+        if (yi < y_min) {
             y_min = yi;
-        else if (yi > y_max)
+        } else if (yi > y_max) {
             y_max = yi;
-
+        }
         zi = point.z;
-        if (zi < z_min)
+        if (zi < z_min) {
             z_min = zi;
-        else if (zi > z_max)
+        } else if (zi > z_max) {
             z_max = zi;
+        }
     }
 
     double x_spread = x_max - x_min;
     double y_spread = y_max - y_min;
     double z_spread = z_max - z_min;
     enum Axis axis;
-    if (x_spread > y_spread && x_spread > z_spread)
+    if (x_spread > y_spread && x_spread > z_spread) {
         axis = X;
-    else if (y_spread > z_spread)
+    } else if (y_spread > z_spread) {
         axis = Y;
-    else
+    } else {
         axis = Z;
+    }
     return axis;
 }
 
@@ -131,8 +144,9 @@ size_t partition_points(struct PointSlice *slice, size_t i_pivot, enum Axis axis
     size_t i_partition = slice->start;
     for (size_t i = slice->start; i < i_last; i++) {
         if (POINT_ACCESS_BY_INDEX(&points[i], axis) < pivot) {
-            if (i_partition != i)
+            if (i_partition != i) {
                 swap_points(&points[i], &points[i_partition]);
+            }
             i_partition++;
         }
     }
@@ -170,7 +184,6 @@ int quickselect(struct PointSlice *slice, size_t k, enum Axis axis)
 
 int partial_median_sort(struct PointSlice *slice, enum Axis axis)
 {
-    size_t size = get_pointslice_size(slice);
-    size_t i_median = size / 2;
+    size_t i_median = (slice->end + slice->start) / 2;
     return quickselect(slice, i_median, axis);
 }

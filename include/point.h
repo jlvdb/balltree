@@ -20,6 +20,7 @@ struct PointSlice {
     struct Point *points;
 };
 
+void print_pointslice(const struct PointSlice *slice);
 size_t get_pointslice_size(const struct PointSlice *slice);
 struct Point get_center_point(const struct PointSlice *slice);
 double get_maxdist_from_center(const struct PointSlice *slice, struct Point center);

@@ -6,7 +6,7 @@
 
 int main(int argc, char** argv)
 {
-    const int N = 9;
+    const int N = 12;
     struct Point points[N] = {
         {1.1, 2.1, 3.1},
         {4.1, 5.1, 6.1},
@@ -18,6 +18,9 @@ int main(int argc, char** argv)
         {7.2, 8.2, 9.2},
         {10.2, 11.2, 12.2},
 
+        {1.3, 2.3, 3.3},
+        {4.3, 5.3, 6.3},
+        {7.3, 8.3, 9.3},
         {10.3, 11.3, 12.3},
     };
     struct PointSlice slice = {
@@ -25,10 +28,9 @@ int main(int argc, char** argv)
         .end = N,
         .points = points,
     };
-    struct BallTree *tree = balltree_build(&slice, 3);
+    struct BallTree *tree = balltree_build(&slice, 6);
     if (!tree) {
         printf("ERROR: tree building failed\n");
-        balltree_print(tree);
         return 1;
     }
     balltree_print(tree);
