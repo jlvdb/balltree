@@ -33,8 +33,8 @@ struct PointBuffer* pointbuffer_create(int);
 void pointbuffer_free(struct PointBuffer*);
 int pointbuffer_resize(struct PointBuffer*, int);
 void print_pointbuffer(const struct PointBuffer*);
-double count_within_radius(struct PointBuffer*, struct Point*, double);
-double count_within_range(struct PointBuffer*, struct Point*, double, double);
+double count_within_radius(const struct PointBuffer*, const struct Point*, double);
+double count_within_range(const struct PointBuffer*, const struct Point*, double, double);
 
 struct PointSlice* pointslice_from_buffer(const struct PointBuffer*);
 void pointslice_free(struct PointSlice*);

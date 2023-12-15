@@ -95,7 +95,7 @@ void print_pointbuffer(const struct PointBuffer *buffer)
     printf("}\n");
 }
 
-double count_within_radius(struct PointBuffer *buffer, struct Point *point, double radius) {
+double count_within_radius(const struct PointBuffer *buffer, const struct Point *point, double radius) {
     double radius2 = radius * radius;
     double counts = 0.0;
     double point_weight = point->weight;
@@ -111,7 +111,7 @@ double count_within_radius(struct PointBuffer *buffer, struct Point *point, doub
     return counts;
 }
 
-double count_within_range(struct PointBuffer *buffer, struct Point *point, double rmin, double rmax) {
+double count_within_range(const struct PointBuffer *buffer, const struct Point *point, double rmin, double rmax) {
     double rmin2 = rmin * rmin;
     double rmax2 = rmax * rmax;
     double counts = 0.0;

@@ -86,16 +86,22 @@ int main(int argc, char** argv)
     printf("built tree in %.3lf sec\n", elapsed);
 
     // query point at fixed radius, show the elapsed time
-    time = clock();
-    count = balltree_count_radius(tree, &query_point, query_radius);
-    elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
-    printf("found %.0lf pairs in %.3lf ms\n", count, elapsed);
+    int imax = 1;
+    while (imax <= 10000) {
+        time = clock();
+        for (int i = 0; i < imax ; ++i)
+            count = balltree_count_radius(tree, &query_point, query_radius);
+        elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
+        printf("%5dx found %.0lf pairs in %8.3lf ms\n", imax, count, elapsed);
+        imax *= 10;
+    }
 
     // bruteforce query point at fixed radius, show the elapsed time
     time = clock();
-    count = count_within_radius(buffer, &query_point, query_radius);
+    for (int i = 0; i < 10 ; ++i)
+        count = count_within_radius(buffer, &query_point, query_radius);
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
-    printf("brute %.0lf pairs in %.3lf ms\n", count, elapsed);
+    printf("    1x brute %.0lf pairs in %8.3lf ms\n", count, elapsed);
 
     balltree_free(tree);
     pointbuffer_free(buffer);

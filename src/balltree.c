@@ -163,6 +163,11 @@ struct BallTree* balltree_build(struct PointBuffer *buffer, int leafsize)
 double bulk_count(struct BallTree *node) {
     double counts = 0.0;
     if (balltree_is_leaf(node)) {
+        struct Point *points = node->data.points;
+        for (size_t i = 0; i < node->data.size; ++i) {
+            struct Point *point_i = points + i;
+            counts += point_i->weight;
+        }
         counts += (double)node->data.size;
     } else {
         counts += bulk_count(node->left);
