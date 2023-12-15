@@ -7,6 +7,7 @@ struct Point {
     double x;
     double y;
     double z;
+    double weight;
 };
 
 enum Axis {X, Y, Z};  // field to index mapping for struct Point
@@ -22,6 +23,8 @@ struct PointSlice {
     struct Point *points;
 };
 
+struct Point create_point_weighted(double, double, double, double);
+struct Point create_point_unweighted(double, double, double);
 void print_point(const struct Point*);
 double points_distance(const struct Point*, const struct Point*);
 double points_distance2(const struct Point*, const struct Point*);

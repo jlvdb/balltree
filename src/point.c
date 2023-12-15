@@ -10,6 +10,16 @@
 #define POINT_ACCESS_BY_INDEX(ptr, index) (*((double*)((char*)(ptr) + (index) * sizeof(double))))
 #define SWAP(temp, a, b) do { (temp) = (a); (a) = (b); (b) = (temp); } while (0)
 
+inline struct Point create_point_weighted(double x, double y, double z, double weight)
+{
+    return (struct Point){x, y, z, weight};
+}
+
+inline struct Point create_point_unweighted(double x, double y, double z)
+{
+    return (struct Point){x, y, z, 1.0};
+}
+
 void print_point(const struct Point *point)
 {
     printf("{%lf, %lf, %lf}\n", point->x, point->y, point->z);
@@ -21,6 +31,7 @@ void swap_points(struct Point *p1, struct Point *p2)
     SWAP(temp, p1->x, p2->x);
     SWAP(temp, p1->y, p2->y);
     SWAP(temp, p1->z, p2->z);
+    SWAP(temp, p1->weight, p2->weight);
 }
 
 double points_distance2(const struct Point *p1, const struct Point *p2)
@@ -87,12 +98,14 @@ void print_pointbuffer(const struct PointBuffer *buffer)
 double count_within_radius(struct PointBuffer *buffer, struct Point *point, double radius) {
     double radius2 = radius * radius;
     double counts = 0.0;
+    double point_weight = point->weight;
 
     struct Point *points = buffer->points;
     for (size_t i = 0; i < buffer->size; ++i) {
-        double distance2 = points_distance2(points + i, point);
+        struct Point *point_i = points + i;
+        double distance2 = points_distance2(point_i, point);
         if (distance2 <= radius2) {
-            counts += 1.0;  // we want weights later
+            counts += point_weight * point_i->weight;
         }
     }
     return counts;
@@ -102,12 +115,14 @@ double count_within_range(struct PointBuffer *buffer, struct Point *point, doubl
     double rmin2 = rmin * rmin;
     double rmax2 = rmax * rmax;
     double counts = 0.0;
+    double point_weight = point->weight;
 
     struct Point *points = buffer->points;
     for (size_t i = 0; i < buffer->size; ++i) {
+        struct Point *point_i = points + i;
         double distance2 = points_distance2(points + i, point);
         if (rmin2 < distance2 && distance2 <= rmax2) {
-            counts += 1.0;  // we want weights later
+            counts += point_weight * point_i->weight;
         }
     }
     return counts;

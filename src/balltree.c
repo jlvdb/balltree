@@ -178,7 +178,7 @@ double balltree_count_radius(struct BallTree *node, struct Point *point, double 
 
     if (balltree_is_leaf(node)) {
         if (distance <= radius - node_radius) {
-            counts += bulk_count(node);  // we want weights later
+            counts += bulk_count(node);
         } else if (distance <= radius + node_radius) {
             counts += count_within_radius(&node->data, point, radius);
         }
@@ -196,12 +196,11 @@ double balltree_count_range(struct BallTree *node, struct Point *point, double r
 
     if (balltree_is_leaf(node)) {
         if (rmin + node_radius < distance && distance <= rmax - node_radius) {
-            counts += bulk_count(node);  // we want weights later
+            counts += bulk_count(node);
         } else if (rmin - node_radius < distance || distance <= rmax + node_radius) {
             counts += count_within_range(&node->data, point, rmin, rmax);
         }
     } else {
-        // traverse
         counts += balltree_count_range(node->left, point, rmin, rmax);
         counts += balltree_count_range(node->right, point, rmin, rmax);
     }
