@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Iinclude -Wall -O3
+CFLAGS = -Iinclude -Wall -O3 -ffast-math
 SRCDIR = src
 BUILDDIR = build
 BINDIR = bin
