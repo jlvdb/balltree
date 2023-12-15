@@ -40,7 +40,7 @@ int main(int argc, char** argv)
         }
         struct Point point = {xi, yi, zi};
         points.points[n_records] = point;
-        n_records++;
+        ++n_records;
     }
     fclose(file);
     // truncate the buffer to the actual size
@@ -58,9 +58,13 @@ int main(int argc, char** argv)
     difftime = (double)(end_time - start_time) / CLOCKS_PER_SEC;
     printf("read %'d records in %.3lf sec\n", n_records, difftime);
 
-    // build the tree and print it
+
+    struct Point qpoint = {0.0, 0.0, 0.0};
+    double radius = 0.1;
+    int leafsize = 4096;
+
+
     start_time = clock();
-    int leafsize = 1000;
     struct PointSlice slice = pointslice_from_buffer(points);
     struct BallTree *tree = balltree_build(&slice, leafsize);
     if (!tree) {
@@ -71,9 +75,6 @@ int main(int argc, char** argv)
     end_time = clock();
     difftime = (double)(end_time - start_time) / CLOCKS_PER_SEC;
     printf("built tree in %.3lf sec\n", difftime);
-
-    struct Point qpoint = {0.0, 0.0, 0.0};
-    double radius = 1.2;
 
     start_time = clock();
     double count = balltree_count_radius(tree, &qpoint, radius);

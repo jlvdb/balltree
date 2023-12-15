@@ -36,6 +36,16 @@ double points_distance(const struct Point *p1, const struct Point *p2)
     return sqrt(points_distance2(p1, p2));
 }
 
+void print_pointbuffer(const struct PointBuffer *buffer)
+{
+    printf("{\n");
+    for (size_t i = 0; i < buffer->size; ++i) {
+        printf("    ");
+        print_point(buffer->points + i);
+    }
+    printf("}\n");
+}
+
 struct PointBuffer pointbuffer_create(int size)
 {
     size_t n_bytes = size * sizeof(struct Point);
@@ -75,14 +85,14 @@ struct PointSlice pointslice_from_buffer(const struct PointBuffer buffer)
 void print_pointslice(const struct PointSlice *slice)
 {
     printf("{\n");
-    for (size_t i = slice->start; i < slice->end; i++) {
+    for (size_t i = slice->start; i < slice->end; ++i) {
         printf("    ");
-        print_point(&slice->points[i]);
+        print_point(slice->points + i);
     }
     printf("}\n");
 }
 
-size_t get_pointslice_size(const struct PointSlice *slice)
+int get_pointslice_size(const struct PointSlice *slice)
 {
     return slice->end - slice->start;
 }
@@ -95,7 +105,7 @@ struct Point get_center_point(const struct PointSlice *slice)
     int total = 1;
 
     struct Point *points = slice->points;
-    for (size_t i = slice->start; i < slice->end; i++, total++) {
+    for (size_t i = slice->start; i < slice->end; ++i, total++) {
         struct Point point = points[i];
         double scale = (double)total;
         center_x += (point.x - center_x) / scale;
@@ -115,10 +125,10 @@ double get_maxdist_from_center(const struct PointSlice *slice, struct Point cent
 {
     double maxdist = 0.0;
     struct Point *points = slice->points;
-    for (size_t i = slice->start; i < slice->end; i++) {
-        double points_distance = points_distance2(&points[i], &center);
-        if (points_distance > maxdist) {
-            maxdist = points_distance;
+    for (size_t i = slice->start; i < slice->end; ++i) {
+        double pdist = points_distance2(points + i, &center);
+        if (pdist > maxdist) {
+            maxdist = pdist;
         }
     }
     return sqrt(maxdist);
@@ -135,7 +145,7 @@ enum Axis get_max_spread_axis(const struct PointSlice *slice)
 
     struct Point *points = slice->points;
     double xi, yi, zi;
-    for (size_t i = slice->start; i < slice->end; i++) {
+    for (size_t i = slice->start; i < slice->end; ++i) {
         struct Point point = points[i];
 
         xi = point.x;
@@ -172,29 +182,29 @@ enum Axis get_max_spread_axis(const struct PointSlice *slice)
     return axis;
 }
 
-size_t partition_points(struct PointSlice *slice, size_t i_pivot, enum Axis axis)
+int partition_points(struct PointSlice *slice, int i_pivot, enum Axis axis)
 {
     struct Point *points = slice->points;
-    size_t i_last = slice->end - 1;
+    int i_last = slice->end - 1;
 
-    double pivot = POINT_ACCESS_BY_INDEX(&points[i_pivot], axis);
-    swap_points(&points[i_pivot], &points[i_last]);
+    double pivot = POINT_ACCESS_BY_INDEX(points + i_pivot, axis);
+    swap_points(points + i_pivot, points + i_last);
 
-    size_t i_partition = slice->start;
-    for (size_t i = slice->start; i < i_last; i++) {
-        if (POINT_ACCESS_BY_INDEX(&points[i], axis) < pivot) {
+    int i_partition = slice->start;
+    for (size_t i = slice->start; i < i_last; ++i) {
+        if (POINT_ACCESS_BY_INDEX(points + i, axis) < pivot) {
             if (i_partition != i) {
-                swap_points(&points[i], &points[i_partition]);
+                swap_points(points + i, points + i_partition);
             }
-            i_partition++;
+            ++i_partition;
         }
     }
 
-    swap_points(&points[i_last], &points[i_partition]);
+    swap_points(points + i_last, points + i_partition);
     return i_partition;
 }
 
-int quickselect(struct PointSlice *slice, size_t k, enum Axis axis)
+int quickselect(struct PointSlice *slice, int k, enum Axis axis)
 {
     if (slice->start < slice->end) {
         int i_pivot = (slice->start + slice->end) / 2;
@@ -223,6 +233,6 @@ int quickselect(struct PointSlice *slice, size_t k, enum Axis axis)
 
 int partial_median_sort(struct PointSlice *slice, enum Axis axis)
 {
-    size_t i_median = (slice->end + slice->start) / 2;
+    int i_median = (slice->end + slice->start) / 2;
     return quickselect(slice, i_median, axis);
 }
