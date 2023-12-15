@@ -26,15 +26,19 @@ void print_point(const struct Point*);
 double points_distance(const struct Point*, const struct Point*);
 double points_distance2(const struct Point*, const struct Point*);
 
-void print_pointbuffer(const struct PointBuffer*);
-struct PointBuffer pointbuffer_create(int);
+struct PointBuffer* pointbuffer_create(int);
+void pointbuffer_free(struct PointBuffer*);
 int pointbuffer_resize(struct PointBuffer*, int);
+void print_pointbuffer(const struct PointBuffer*);
+double count_within_radius(struct PointBuffer*, struct Point*, double);
+double count_within_range(struct PointBuffer*, struct Point*, double, double);
 
-struct PointSlice pointslice_from_buffer(const struct PointBuffer);
+struct PointSlice* pointslice_from_buffer(const struct PointBuffer*);
+void pointslice_free(struct PointSlice*);
 void print_pointslice(const struct PointSlice*);
 int get_pointslice_size(const struct PointSlice*);
 struct Point get_center_point(const struct PointSlice*);
-double get_maxdist_from_center(const struct PointSlice*, struct Point);
+double get_maxdist_from_center(const struct PointSlice*, struct Point*);
 enum Axis get_max_spread_axis(const struct PointSlice*);
 int partial_median_sort(struct PointSlice *, enum Axis);
 

@@ -36,29 +36,31 @@ double points_distance(const struct Point *p1, const struct Point *p2)
     return sqrt(points_distance2(p1, p2));
 }
 
-void print_pointbuffer(const struct PointBuffer *buffer)
+struct PointBuffer* pointbuffer_create(int size)
 {
-    printf("{\n");
-    for (size_t i = 0; i < buffer->size; ++i) {
-        printf("    ");
-        print_point(buffer->points + i);
+    struct PointBuffer *buffer = (struct PointBuffer*)malloc(sizeof(struct PointBuffer));
+    if (!buffer) {
+        fprintf(stderr, "ERROR: memory allocation failed");
+        return NULL;
     }
-    printf("}\n");
+
+    size_t n_bytes = size * sizeof(struct Point);
+    buffer->points = (struct Point*)malloc(n_bytes);
+    if (!buffer->points) {
+        fprintf(stderr, "ERROR: memory allocation failed");
+        free(buffer);
+        return NULL;
+    }
+    buffer->size = size;
+    return buffer;
 }
 
-struct PointBuffer pointbuffer_create(int size)
+void pointbuffer_free(struct PointBuffer *buffer)
 {
-    size_t n_bytes = size * sizeof(struct Point);
-
-    struct PointBuffer buffer;
-    buffer.points = (struct Point*)malloc(n_bytes);
-    if (!buffer.points) {
-        perror("memory allocation failed");
-        buffer.size = -1;
-    } else {
-        buffer.size = size;
+    if (buffer->points) {
+        free(buffer->points);
     }
-    return buffer;
+    free(buffer);
 }
 
 int pointbuffer_resize(struct PointBuffer *buffer, int newsize)
@@ -72,14 +74,64 @@ int pointbuffer_resize(struct PointBuffer *buffer, int newsize)
     return SUCCESS;
 }
 
-struct PointSlice pointslice_from_buffer(const struct PointBuffer buffer)
+void print_pointbuffer(const struct PointBuffer *buffer)
 {
-    struct PointSlice slice = {
-        .start = 0,
-        .end = buffer.size,
-        .points = buffer.points,
-    };
+    printf("{\n");
+    for (size_t i = 0; i < buffer->size; ++i) {
+        printf("    ");
+        print_point(buffer->points + i);
+    }
+    printf("}\n");
+}
+
+double count_within_radius(struct PointBuffer *buffer, struct Point *point, double radius) {
+    double radius2 = radius * radius;
+    double counts = 0.0;
+
+    struct Point *points = buffer->points;
+    for (size_t i = 0; i < buffer->size; ++i) {
+        double distance2 = points_distance2(points + i, point);
+        if (distance2 <= radius2) {
+            counts += 1.0;  // we want weights later
+        }
+    }
+    return counts;
+}
+
+double count_within_range(struct PointBuffer *buffer, struct Point *point, double rmin, double rmax) {
+    double rmin2 = rmin * rmin;
+    double rmax2 = rmax * rmax;
+    double counts = 0.0;
+
+    struct Point *points = buffer->points;
+    for (size_t i = 0; i < buffer->size; ++i) {
+        double distance2 = points_distance2(points + i, point);
+        if (rmin2 < distance2 && distance2 <= rmax2) {
+            counts += 1.0;  // we want weights later
+        }
+    }
+    return counts;
+}
+
+struct PointSlice* pointslice_from_buffer(const struct PointBuffer *buffer)
+{
+    struct PointSlice *slice = (struct PointSlice*)malloc(sizeof(struct PointSlice));
+    if (!slice) {
+        fprintf(stderr, "ERROR: memory allocation failed");
+        return NULL;
+    }
+    slice->start = 0;
+    slice->end = buffer->size;
+    slice->points = buffer->points;
     return slice;
+}
+
+void pointslice_free(struct PointSlice *slice)
+{
+    if (slice->points) {
+        free(slice->points);
+    }
+    free(slice);
 }
 
 void print_pointslice(const struct PointSlice *slice)
@@ -121,12 +173,12 @@ struct Point get_center_point(const struct PointSlice *slice)
     return center;
 }
 
-double get_maxdist_from_center(const struct PointSlice *slice, struct Point center)
+double get_maxdist_from_center(const struct PointSlice *slice, struct Point *center)
 {
     double maxdist = 0.0;
     struct Point *points = slice->points;
     for (size_t i = slice->start; i < slice->end; ++i) {
-        double pdist = points_distance2(points + i, &center);
+        double pdist = points_distance2(points + i, center);
         if (pdist > maxdist) {
             maxdist = pdist;
         }

@@ -5,90 +5,99 @@
 #include "point.h"
 #include "balltree.h"
 
-
-int main(int argc, char** argv)
+struct PointBuffer* load_data_from_file()
 {
-    clock_t start_time, end_time;
-    double difftime;
-    setlocale(LC_NUMERIC, "");
-
-    double xi, yi, zi;
-    int n_records = 0;
-    struct PointBuffer points = pointbuffer_create(100);
-    if (points.size < 0) {
-        perror("memory allocation failed");
-        free(points.points);
-        return 1;
+    struct PointBuffer *buffer = pointbuffer_create(100);
+    if (!buffer) {
+        fprintf(stderr, "ERROR: memory allocation failed");
+        pointbuffer_free(buffer);
+        return NULL;
     }
 
-    start_time = clock();
-    FILE *file = fopen("testing/points.txt", "r");
+    static const char filepath[] = "testing/points.txt";
+    FILE *file = fopen(filepath, "r");
     if (file == NULL) {
-        perror("failed to open file");
-        free(points.points);
-        return 1;
+        fprintf(stderr, "ERROR: failed to open file: %s", filepath);
+        pointbuffer_free(buffer);
+        return NULL;
     }
-    // load the data from file while dynamically growing the point buffer
-    while (fscanf(file, "%lf %lf %lf", &xi, &yi, &zi) == 3) {
-        if (n_records == points.size) {
-            if (!pointbuffer_resize(&points, points.size * 2)) {
-                perror("memory allocation failed");
-                free(points.points);
+
+    int n_records = 0;
+    struct Point point;
+    while (fscanf(file, "%lf %lf %lf", &point.x, &point.y, &point.z) == 3) {
+        if (n_records == buffer->size) {
+            if (!pointbuffer_resize(buffer, buffer->size * 2)) {
+                fprintf(stderr, "ERROR: failed to expand buffer");
+                pointbuffer_free(buffer);
                 fclose(file);
-                return 1;
+                return NULL;
             }
         }
-        struct Point point = {xi, yi, zi};
-        points.points[n_records] = point;
+        buffer->points[n_records] = point;
         ++n_records;
     }
     fclose(file);
-    // truncate the buffer to the actual size
+
     if (n_records == 0) {
-        perror("did not read any records from file");
-        free(points.points);
-        return 1;
+        fprintf(stderr, "ERROR: could not read any records from file");
+        pointbuffer_free(buffer);
+        return NULL;
     }
-    if (!pointbuffer_resize(&points, n_records)) {
-        perror("memory reallocation failed");
-        free(points.points);
-        return 1;
+    if (!pointbuffer_resize(buffer, n_records)) {
+        fprintf(stderr, "ERROR: memory reallocation failed");
+        pointbuffer_free(buffer);
+        return NULL;
     }
-    end_time = clock();
-    difftime = (double)(end_time - start_time) / CLOCKS_PER_SEC;
-    printf("read %'d records in %.3lf sec\n", n_records, difftime);
+    return buffer;
+}
 
-
-    struct Point qpoint = {0.0, 0.0, 0.0};
-    double radius = 0.1;
+int main(int argc, char** argv)
+{
+    struct Point query_point = {0.0, 0.0, 0.0};
+    double query_radius = 0.1;
     int leafsize = 4096;
 
+    struct PointBuffer *buffer;
+    struct BallTree *tree;
+    double count;
 
-    start_time = clock();
-    struct PointSlice slice = pointslice_from_buffer(points);
-    struct BallTree *tree = balltree_build(&slice, leafsize);
-    if (!tree) {
-        perror("tree building failed");
-        free(points.points);
+    clock_t time;
+    double elapsed;
+    setlocale(LC_NUMERIC, "");
+
+    // read the input file contents, show the elapsed time
+    time = clock();
+    buffer = load_data_from_file();
+    if (!buffer) {
         return 1;
     }
-    end_time = clock();
-    difftime = (double)(end_time - start_time) / CLOCKS_PER_SEC;
-    printf("built tree in %.3lf sec\n", difftime);
+    elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
+    int n_records = buffer->size;
+    printf("read %'d records in %.3lf sec\n", n_records, elapsed);
 
-    start_time = clock();
-    double count = balltree_count_radius(tree, &qpoint, radius);
-    end_time = clock();
-    difftime = (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0;
-    printf("found %.0lf pairs in %.3lf ms\n", count, difftime);
+    // build the ball tree, show the elapsed time
+    time = clock();
+    tree = balltree_build(buffer, leafsize);
+    if (!tree) {
+        pointbuffer_free(buffer);
+        return 1;
+    }
+    elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
+    printf("built tree in %.3lf sec\n", elapsed);
 
-    start_time = clock();
-    count = count_within_radius(&points, &qpoint, radius);
-    end_time = clock();
-    difftime = (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0;
-    printf("brute %.0lf pairs in %.3lf ms\n", count, difftime);
+    // query point at fixed radius, show the elapsed time
+    time = clock();
+    count = balltree_count_radius(tree, &query_point, query_radius);
+    elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
+    printf("found %.0lf pairs in %.3lf ms\n", count, elapsed);
+
+    // bruteforce query point at fixed radius, show the elapsed time
+    time = clock();
+    count = count_within_radius(buffer, &query_point, query_radius);
+    elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
+    printf("brute %.0lf pairs in %.3lf ms\n", count, elapsed);
 
     balltree_free(tree);
-    free(points.points);
+    pointbuffer_free(buffer);
     return 0;
 }

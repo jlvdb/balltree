@@ -12,7 +12,7 @@ struct BallTree* balltree_create_node(struct Point center, double radius)
 {
     struct BallTree *node = (struct BallTree*)calloc(1, sizeof(struct BallTree));
     if (!node) {
-        perror("BallTree node allocation failed");
+        fprintf(stderr, "ERROR: BallTree node allocation failed");
         return NULL;
     }
     node->center = center;
@@ -32,7 +32,7 @@ struct BallTree* balltree_create_leaf(struct Point center, double radius, const 
     node->data.size = size;
     node->data.points = (struct Point*)malloc(n_bytes);
     if (!node->data.points) {
-        perror("BallTree leaf data allocation failed");
+        fprintf(stderr, "ERROR: BallTree leaf data allocation failed");
         free(node);
         return NULL;
     }
@@ -49,6 +49,21 @@ int balltree_is_leaf(const struct BallTree *node)
     } else {
         return TRUE;
     }
+}
+
+void balltree_free(struct BallTree *node)
+{
+    if (balltree_is_leaf(node)) {
+        free(node->data.points);
+    } else {
+        if (node->left) {
+            balltree_free(node->left);
+        }
+        if (node->right) {
+            balltree_free(node->right);
+        }
+    }
+    free(node);
 }
 
 void balltree_print_indented(const struct BallTree *node, int indent)
@@ -90,7 +105,7 @@ struct BallTree* create_child(struct PointSlice *parent, int leafsize, int split
         child.start = split_index;
         child.end = parent->end;
     }
-    return balltree_build(&child, leafsize);
+    return balltree_build_recursive(&child, leafsize);
 }
 
 void attach_childs(struct BallTree *node, struct PointSlice *points, int leafsize)
@@ -98,7 +113,7 @@ void attach_childs(struct BallTree *node, struct PointSlice *points, int leafsiz
     enum Axis split_axis = get_max_spread_axis(points);
     int i_split = partial_median_sort(points, split_axis);
     if (i_split == -1) {
-        perror("could not determine the median element for the next split");
+        fprintf(stderr, "ERROR: could not determine the median element for the next split");
         print_pointslice(points);
         return;
     }
@@ -110,25 +125,26 @@ void attach_childs(struct BallTree *node, struct PointSlice *points, int leafsiz
     node->right = create_child(points, leafsize, i_split, FALSE);
     if (!node->right) {
         balltree_free(node->left);
+        node->left = NULL;
     }
 }
 
-struct BallTree* balltree_build(struct PointSlice *points, int leafsize)
+struct BallTree* balltree_build_recursive(struct PointSlice *slice, int leafsize)
 {
-    int size = get_pointslice_size(points);
+    int size = get_pointslice_size(slice);
     if (size < 1) {
         return NULL;
     }
-    struct Point center = get_center_point(points);
-    double radius = get_maxdist_from_center(points, center);
+    struct Point center = get_center_point(slice);
+    double radius = get_maxdist_from_center(slice, &center);
 
     if (size <= leafsize) {
-        return balltree_create_leaf(center, radius, points);
+        return balltree_create_leaf(center, radius, slice);
     }
 
     struct BallTree *node = balltree_create_node(center, radius);
     if (node) {
-        attach_childs(node, points, leafsize);
+        attach_childs(node, slice, leafsize);
     }
     if (!node->left || !node->right) {
         return NULL;
@@ -136,21 +152,12 @@ struct BallTree* balltree_build(struct PointSlice *points, int leafsize)
     return node;
 }
 
-void balltree_free(struct BallTree *node)
+struct BallTree* balltree_build(struct PointBuffer *buffer, int leafsize)
 {
-    if (balltree_is_leaf(node)) {
-        free(node->data.points);
-        node->data.points = NULL;
-    } else {
-        if (node->left) {
-            balltree_free(node->left);
-        }
-        if (node->right) {
-            balltree_free(node->right);
-        }
-    }
-    free(node);
-    node = NULL;
+    struct PointSlice *slice = pointslice_from_buffer(buffer);
+    struct BallTree *tree = balltree_build_recursive(slice, leafsize);
+    free(slice);
+    return tree;
 }
 
 double bulk_count(struct BallTree *node) {
@@ -160,35 +167,6 @@ double bulk_count(struct BallTree *node) {
     } else {
         counts += bulk_count(node->left);
         counts += bulk_count(node->right);
-    }
-    return counts;
-}
-
-double count_within_radius(struct PointBuffer *buffer, struct Point *point, double radius) {
-    double radius2 = radius * radius;
-    double counts = 0.0;
-
-    struct Point *points = buffer->points;
-    for (size_t i = 0; i < buffer->size; ++i) {
-        double distance2 = points_distance2(points + i, point);
-        if (distance2 <= radius2) {
-            counts += 1.0;  // we want weights later
-        }
-    }
-    return counts;
-}
-
-double count_within_range(struct PointBuffer *buffer, struct Point *point, double rmin, double rmax) {
-    double rmin2 = rmin * rmin;
-    double rmax2 = rmax * rmax;
-    double counts = 0.0;
-
-    struct Point *points = buffer->points;
-    for (size_t i = 0; i < buffer->size; ++i) {
-        double distance2 = points_distance2(points + i, point);
-        if (rmin2 < distance2 && distance2 <= rmax2) {
-            counts += 1.0;  // we want weights later
-        }
     }
     return counts;
 }
