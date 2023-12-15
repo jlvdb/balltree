@@ -33,9 +33,12 @@ struct BallTree* balltree_create_leaf(struct Point center, double radius, const 
     node->data.points = (struct Point*)malloc(n_bytes);
     if (!node->data.points) {
         perror("BallTree leaf data allocation failed");
+        free(node);
         return NULL;
     }
 
+    const struct Point* slice_offset = slice->points + slice->start;
+    memcpy(node->data.points, slice_offset, n_bytes);
     return node;
 }
 
