@@ -57,27 +57,24 @@ cdef class BallTreeWrapped:
     ):
         size = x.shape[0]
         if weight is None:
-            # Create a weight array with double ones if not provided
             weight = np.ones_like(x)
 
-        # Assuming x, y, and z have the same length and are 1-dimensional arrays
         if size != y.shape[0] or size != z.shape[0] or size != weight.shape[0]:
-            raise ValueError("Input arrays must have the same length")
+            raise ValueError("input arrays must have the same length")
 
-        # Create a PointBuffer and copy data
         cdef PointBuffer *point_buffer = pointbuffer_create(size)
         if point_buffer is NULL:
             raise MemoryError("Failed to allocate memory for PointBuffer")
-
-        for i in range(point_buffer.size):
+        for i in range(size):
             point_buffer.points[i].x = x[i]
             point_buffer.points[i].y = y[i]
             point_buffer.points[i].z = z[i]
             point_buffer.points[i].weight = weight[i]
 
-        # Build the BallTree
         self._tree = balltree_build(point_buffer, leafsize)
-        pointbuffer_free(point_buffer)
+        pointbuffer_free(point_buffer)  # data is copied into the tree itself
+        if self._tree is NULL:
+            raise RuntimeError("failed to allocate and build tree structure")
 
     def __dealloc__(self):
         balltree_free(self._tree)
