@@ -8,7 +8,7 @@ struct BallTree {
     double radius;
     struct BallTree *left;
     struct BallTree *right;
-    struct PointBuffer data;
+    struct PointSlice data;
 };
 
 int balltree_is_leaf(const struct BallTree*);

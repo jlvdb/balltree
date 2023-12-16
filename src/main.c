@@ -54,7 +54,7 @@ struct PointBuffer* load_data_from_file()
 int main(int argc, char** argv)
 {
     struct Point query_point = create_point_weighted(0.0, 0.0, 0.0, 0.5);
-    double query_radius = 0.2;
+    double query_radius = 0.8;
     int leafsize = 20;
 
     struct PointBuffer *buffer;
