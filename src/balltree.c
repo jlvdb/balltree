@@ -160,54 +160,165 @@ struct BallTree* balltree_build(struct PointBuffer *buffer, int leafsize)
     return tree;
 }
 
-double bulk_count(struct BallTree *node) {
-    double counts = 0.0;
-    if (balltree_is_leaf(node)) {
-        struct Point *points = node->data.points;
-        for (size_t i = 0; i < node->data.size; ++i) {
-            struct Point *point_i = points + i;
-            counts += point_i->weight;
-        }
-        counts += (double)node->data.size;
-    } else {
-        counts += bulk_count(node->left);
-        counts += bulk_count(node->right);
+double sum_weights(struct PointBuffer *buffer)
+{
+    double sumw = 0.0;
+    struct Point *points = buffer->points;
+    for (size_t i = 0; i < buffer->size; ++i) {
+        struct Point *point_i = points + i;
+        sumw += point_i->weight;
     }
+    return sumw;
+}
+
+double count_bulk(struct BallTree *node, const struct Point *point)
+{
+    if (balltree_is_leaf(node)) {
+        return point->weight * sum_weights(&node->data);
+    }
+    double counts = 0.0;
+    counts += count_bulk(node->left, point);
+    counts += count_bulk(node->right, point);
     return counts;
 }
 
-double balltree_count_radius(struct BallTree *node, struct Point *point, double radius) {
-    double counts = 0.0;
+double sum_weights_within_radius2(struct PointBuffer *buffer, const struct Point *point, double radius2)
+{
+    double sumw = 0.0;
+    struct Point *points = buffer->points;
+    for (size_t i = 0; i < buffer->size; ++i) {
+        struct Point *point_i = points + i;
+        double distance2 = points_distance2(point_i, point);
+        if (distance2 <= radius2) {
+            sumw += point_i->weight;
+        }
+    }
+    return sumw;
+}
+
+double balltree_count_radius(struct BallTree *node, struct Point *point, double radius)
+{
     double distance = points_distance(&node->center, point);
     double node_radius = node->radius;
-
-    if (balltree_is_leaf(node)) {
-        if (distance <= radius - node_radius) {
-            counts += bulk_count(node);
-        } else if (distance <= radius + node_radius) {
-            counts += count_within_radius(&node->data, point, radius);
+    if (distance <= radius - node_radius) {
+        // all points are pairs, stop distance evaluation
+        return count_bulk(node, point);
+    } else if (distance <= radius + node_radius) {
+        // some points may be pairs
+        if (balltree_is_leaf(node)) {
+            // check each point individually
+            return point->weight * sum_weights_within_radius2(&node->data, point, radius * radius);
         }
-    } else {
+        // traverse the tree to narrow down the node size
+        double counts = 0.0;
         counts += balltree_count_radius(node->left, point, radius);
         counts += balltree_count_radius(node->right, point, radius);
+        return counts;
+    }
+    return 0.0;
+}
+
+double sum_weights_within_range2(struct PointBuffer *buffer, const struct Point *point, double rmin2, double rmax2)
+{
+    double sumw = 0.0;
+    struct Point *points = buffer->points;
+    for (size_t i = 0; i < buffer->size; ++i) {
+        struct Point *point_i = points + i;
+        double distance2 = points_distance2(point_i, point);
+        if (rmin2 < distance2 || distance2 <= rmax2) {
+            sumw += point_i->weight;
+        }
+    }
+    return sumw;
+}
+
+double balltree_count_range(struct BallTree *node, struct Point *point, double rmin, double rmax)
+{
+    double distance = points_distance(&node->center, point);
+    double node_radius = node->radius;
+    if (rmin + node_radius < distance && distance <= rmax - node_radius) {
+        // all points are pairs, stop distance evaluation
+        return count_bulk(node, point);
+    } else if (rmin - node_radius < distance || distance <= rmax + node_radius) {
+        // some points may be pairs
+        if (balltree_is_leaf(node)) {
+            // check each point individually
+            return point->weight * sum_weights_within_range2(&node->data, point, rmin * rmin, rmax * rmax);
+        }
+        // traverse the tree to narrow down the node size
+        double counts = 0.0;
+        counts += balltree_count_range(node->left, point, rmin, rmax);
+        counts += balltree_count_range(node->right, point, rmin, rmax);
+        return counts;
+    }
+    return 0.0;
+}
+
+double dualcount_bulk(struct BallTree *node1, struct BallTree *node2)
+{
+    double counts = 0.0;
+    int node1_is_leaf = balltree_is_leaf(node1);
+    int node2_is_leaf = balltree_is_leaf(node2);
+
+    if (!node1_is_leaf && !node2_is_leaf) {
+        counts += dualcount_bulk(node1->left, node2->left);
+        counts += dualcount_bulk(node1->left, node2->right);
+        counts += dualcount_bulk(node1->right, node2->left);
+        counts += dualcount_bulk(node1->right, node2->right);
+    } else if (!node1_is_leaf) {  // node2 is leaf
+        counts += dualcount_bulk(node1->left, node2);
+        counts += dualcount_bulk(node1->right, node2);
+    } else if (!node2_is_leaf) {  // node1 is leaf
+        counts += dualcount_bulk(node1, node2->left);
+        counts += dualcount_bulk(node1, node2->right);
+    } else {
+        counts += sum_weights(&node1->data) * sum_weights(&node2->data);
     }
     return counts;
 }
 
-double balltree_count_range(struct BallTree *node, struct Point *point, double rmin, double rmax) {
-    double counts = 0.0;
-    double distance = points_distance(&node->center, point);
-    double node_radius = node->radius;
-
-    if (balltree_is_leaf(node)) {
-        if (rmin + node_radius < distance && distance <= rmax - node_radius) {
-            counts += bulk_count(node);
-        } else if (rmin - node_radius < distance || distance <= rmax + node_radius) {
-            counts += count_within_range(&node->data, point, rmin, rmax);
-        }
-    } else {
-        counts += balltree_count_range(node->left, point, rmin, rmax);
-        counts += balltree_count_range(node->right, point, rmin, rmax);
+double dualsum_weights_within_radius2(struct PointBuffer *buffer1, struct PointBuffer *buffer2, double radius2)
+{
+    double sumw = 0.0;
+    struct Point *points1 = buffer1->points;
+    for (size_t i = 0; i < buffer1->size; ++i) {
+        struct Point *point1_i = points1 + i;
+        sumw += point1_i->weight * sum_weights_within_radius2(buffer2, point1_i, radius2);
     }
-    return counts;
+    return sumw;
+}
+
+double balltree_dualcount_radius(struct BallTree *node1, struct BallTree *node2, double radius)
+{
+    double distance = points_distance(&node1->center, &node2->center);
+    double node1_radius = node1->radius;
+    double node2_radius = node2->radius;
+    if (distance <= radius - node1_radius - node2_radius) {
+        // all points are pairs, stop distance evaluation
+        return dualcount_bulk(node1, node2);
+    } else if (distance <= radius + node1_radius + node2_radius) {
+        // some points may be pairs
+        int node1_is_leaf = balltree_is_leaf(node1);
+        int node2_is_leaf = balltree_is_leaf(node2);
+        double counts = 0.0;
+        if (node1_is_leaf && node2_is_leaf) {
+            // check all pairs of points individually
+            return dualsum_weights_within_radius2(&node1->data, &node2->data, radius * radius);
+        }
+        // traverse the tree to narrow down the node size
+        if (!node1_is_leaf) {  // node2 is leaf
+            counts += balltree_dualcount_radius(node1->left, node2, radius);
+            counts += balltree_dualcount_radius(node1->right, node2, radius);
+        } else if (!node2_is_leaf) {  // node1 is leaf
+            counts += balltree_dualcount_radius(node1, node2->left, radius);
+            counts += balltree_dualcount_radius(node1, node2->right, radius);
+        } else {
+            counts += balltree_dualcount_radius(node1->left, node2->left, radius);
+            counts += balltree_dualcount_radius(node1->left, node2->right, radius);
+            counts += balltree_dualcount_radius(node1->right, node2->left, radius);
+            counts += balltree_dualcount_radius(node1->right, node2->right, radius);
+        }
+        return counts;
+    }
+    return 0.0;
 }

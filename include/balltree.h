@@ -18,5 +18,6 @@ struct BallTree* balltree_build_recursive(struct PointSlice*, int);
 struct BallTree* balltree_build(struct PointBuffer*, int);
 double balltree_count_radius(struct BallTree*, struct Point*, double);
 double balltree_count_range(struct BallTree*, struct Point*, double, double);
+double balltree_dualcount_radius(struct BallTree*, struct BallTree*, double);
 
 #endif /* BALLTREE_H */

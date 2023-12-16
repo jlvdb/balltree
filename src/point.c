@@ -95,39 +95,6 @@ void print_pointbuffer(const struct PointBuffer *buffer)
     printf("}\n");
 }
 
-double count_within_radius(const struct PointBuffer *buffer, const struct Point *point, double radius) {
-    double radius2 = radius * radius;
-    double counts = 0.0;
-    double point_weight = point->weight;
-
-    struct Point *points = buffer->points;
-    for (size_t i = 0; i < buffer->size; ++i) {
-        struct Point *point_i = points + i;
-        double distance2 = points_distance2(point_i, point);
-        if (distance2 <= radius2) {
-            counts += point_weight * point_i->weight;
-        }
-    }
-    return counts;
-}
-
-double count_within_range(const struct PointBuffer *buffer, const struct Point *point, double rmin, double rmax) {
-    double rmin2 = rmin * rmin;
-    double rmax2 = rmax * rmax;
-    double counts = 0.0;
-    double point_weight = point->weight;
-
-    struct Point *points = buffer->points;
-    for (size_t i = 0; i < buffer->size; ++i) {
-        struct Point *point_i = points + i;
-        double distance2 = points_distance2(points + i, point);
-        if (rmin2 < distance2 && distance2 <= rmax2) {
-            counts += point_weight * point_i->weight;
-        }
-    }
-    return counts;
-}
-
 struct PointSlice* pointslice_from_buffer(const struct PointBuffer *buffer)
 {
     struct PointSlice *slice = (struct PointSlice*)malloc(sizeof(struct PointSlice));

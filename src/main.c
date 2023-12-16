@@ -23,7 +23,7 @@ struct PointBuffer* load_data_from_file()
     }
 
     int n_records = 0;
-    struct Point point = create_point_unweighted(0.0, 0.0, 0.0);
+    struct Point point = create_point_weighted(0.0, 0.0, 0.0, 0.5);
     while (fscanf(file, "%lf %lf %lf", &point.x, &point.y, &point.z) == 3) {
         if (n_records == buffer->size) {
             if (!pointbuffer_resize(buffer, buffer->size * 2)) {
@@ -53,9 +53,9 @@ struct PointBuffer* load_data_from_file()
 
 int main(int argc, char** argv)
 {
-    struct Point query_point = create_point_unweighted(0.0, 0.0, 0.0);
-    double query_radius = 0.1;
-    int leafsize = 4096;
+    struct Point query_point = create_point_weighted(0.0, 0.0, 0.0, 0.5);
+    double query_radius = 0.2;
+    int leafsize = 20;
 
     struct PointBuffer *buffer;
     struct BallTree *tree;
@@ -84,24 +84,24 @@ int main(int argc, char** argv)
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
     printf("built tree in %.3lf sec\n", elapsed);
+    printf("radius=%.3lf\n", query_radius);
 
     // query point at fixed radius, show the elapsed time
     int imax = 1;
-    while (imax <= 10000) {
+    while (imax <= 100) {
         time = clock();
         for (int i = 0; i < imax ; ++i)
             count = balltree_count_radius(tree, &query_point, query_radius);
         elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
-        printf("%5dx found %.0lf pairs in %8.3lf ms\n", imax, count, elapsed);
+        printf("%3dx found %9.0lf pairs in %7.3lf ms\n", imax, count, elapsed);
         imax *= 10;
     }
 
-    // bruteforce query point at fixed radius, show the elapsed time
+    // query with itself, show the elapsed time
     time = clock();
-    for (int i = 0; i < 10 ; ++i)
-        count = count_within_radius(buffer, &query_point, query_radius);
-    elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
-    printf("    1x brute %.0lf pairs in %8.3lf ms\n", count, elapsed);
+    count = balltree_dualcount_radius(tree, tree, query_radius);
+    elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
+    printf("self found %9.0lf pairs in %7.3lf sec\n", count, elapsed);
 
     balltree_free(tree);
     pointbuffer_free(buffer);
