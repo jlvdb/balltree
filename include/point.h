@@ -43,6 +43,6 @@ int get_pointslice_size(const struct PointSlice*);
 struct Point get_center_point(const struct PointSlice*);
 double get_maxdist_from_center(const struct PointSlice*, struct Point*);
 enum Axis get_max_spread_axis(const struct PointSlice*);
-int partial_median_sort(struct PointSlice *, enum Axis);
+int partial_median_sort(struct PointSlice*, enum Axis);
 
 #endif /* POINT_H */
