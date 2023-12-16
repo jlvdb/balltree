@@ -1,5 +1,6 @@
 import numpy as np
 cimport numpy as np
+from libc.stdlib cimport malloc, free
 
 
 cdef extern from "../include/point.h":
@@ -8,11 +9,6 @@ cdef extern from "../include/point.h":
         double y
         double z
         double weight
-
-    cdef enum Axis:
-        X
-        Y
-        Z
 
     cdef struct PointBuffer:
         int size
@@ -23,45 +19,72 @@ cdef extern from "../include/point.h":
         int end
         Point *points
 
-    Point create_point_weighted(double, double, double, double)
-    Point create_point_unweighted(double, double, double)
-    void print_point(const Point*)
-    double points_distance(const Point*, const Point*)
-    double points_distance2(const Point*, const Point*)
-
     PointBuffer* pointbuffer_create(int)
     void pointbuffer_free(PointBuffer*)
     int pointbuffer_resize(PointBuffer*, int)
-    void print_pointbuffer(const PointBuffer*)
-    double count_within_radius(const PointBuffer*, const Point*, double)
-    double count_within_range(const PointBuffer*, const Point*, double, double)
-
-    PointSlice* pointslice_from_buffer(const PointBuffer*)
-    void pointslice_free(PointSlice*)
-    void print_pointslice(const PointSlice*)
-    int get_pointslice_size(const PointSlice*)
 
 
 cdef extern from "../include/balltree.h":
-    cdef struct BallTree:
+    cdef struct BallNode:
         Point center
         double radius
-        BallTree *left
-        BallTree *right
-        PointBuffer data
+        BallNode *left
+        BallNode *right
+        PointSlice data
 
-    int balltree_is_leaf(const BallTree*)
+    cdef struct BallTree:
+        BallNode *root
+        PointBuffer data
+        int leafsize
+
     void balltree_free(BallTree*)
-    void balltree_print(const BallTree*)
-    BallTree* balltree_build_recursive(PointSlice*, int)
     BallTree* balltree_build(PointBuffer*, int)
     double balltree_count_radius(BallTree*, Point*, double)
     double balltree_count_range(BallTree*, Point*, double, double)
+    double balltree_dualcount_radius(BallTree*, BallTree*, double)
 
 
-cdef class TestClass:
-    cdef Point point
+cdef class BallTreeWrapped:
+    cdef BallTree *_tree
 
-    def __cinit__(self, x: double, y: double, z: double):
-        self.point = Point(x, y, z, 1.0)
-        print_point(&self.point)
+    def __cinit__(
+        self,
+        np.ndarray[np.double_t, ndim=1] x,
+        np.ndarray[np.double_t, ndim=1] y,
+        np.ndarray[np.double_t, ndim=1] z,
+        np.ndarray[np.double_t, ndim=1] weight=None,
+        int leafsize=20,
+    ):
+        size = x.shape[0]
+        if weight is None:
+            # Create a weight array with double ones if not provided
+            weight = np.ones_like(x)
+
+        # Assuming x, y, and z have the same length and are 1-dimensional arrays
+        if size != y.shape[0] or size != z.shape[0] or size != weight.shape[0]:
+            raise ValueError("Input arrays must have the same length")
+
+        # Create a PointBuffer and copy data
+        cdef PointBuffer *point_buffer = pointbuffer_create(size)
+        if point_buffer is NULL:
+            raise MemoryError("Failed to allocate memory for PointBuffer")
+
+        for i in range(point_buffer.size):
+            point_buffer.points[i].x = x[i]
+            point_buffer.points[i].y = y[i]
+            point_buffer.points[i].z = z[i]
+            point_buffer.points[i].weight = weight[i]
+
+        # Build the BallTree
+        self._tree = balltree_build(point_buffer, leafsize)
+        pointbuffer_free(point_buffer)
+
+    def __dealloc__(self):
+        balltree_free(self._tree)
+
+    def count_radius(self, x: float, y: float, z: float, weight: float, radius: float) -> float:
+        cdef Point point = Point(x, y, z, weight)
+        return balltree_count_radius(self._tree, &point, radius)
+
+    def dualcount_radius(self, other: BallTreeWrapped, radius: float) -> float:
+        return balltree_dualcount_radius(self._tree, other._tree, radius)
