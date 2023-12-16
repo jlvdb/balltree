@@ -23,7 +23,7 @@ struct PointBuffer* load_data_from_file()
     }
 
     int n_records = 0;
-    struct Point point = create_point_weighted(0.0, 0.0, 0.0, 0.5);
+    struct Point point = {0.0, 0.0, 0.0, 0.5};
     while (fscanf(file, "%lf %lf %lf", &point.x, &point.y, &point.z) == 3) {
         if (n_records == buffer->size) {
             if (!pointbuffer_resize(buffer, buffer->size * 2)) {
@@ -53,7 +53,7 @@ struct PointBuffer* load_data_from_file()
 
 int main(int argc, char** argv)
 {
-    struct Point query_point = create_point_weighted(0.0, 0.0, 0.0, 0.5);
+    struct Point query_point = {0.0, 0.0, 0.0, 0.5};
     double query_radius = 0.2;
     int leafsize = 20;
 

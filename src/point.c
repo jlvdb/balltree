@@ -10,21 +10,6 @@
 #define POINT_ACCESS_BY_INDEX(ptr, index) (*((double*)((char*)(ptr) + (index) * sizeof(double))))
 #define SWAP(temp, a, b) do { (temp) = (a); (a) = (b); (b) = (temp); } while (0)
 
-inline struct Point create_point_weighted(double x, double y, double z, double weight)
-{
-    return (struct Point){x, y, z, weight};
-}
-
-inline struct Point create_point_unweighted(double x, double y, double z)
-{
-    return (struct Point){x, y, z, 1.0};
-}
-
-void print_point(const struct Point *point)
-{
-    printf("{%lf, %lf, %lf}\n", point->x, point->y, point->z);
-}
-
 void swap_points(struct Point *p1, struct Point *p2)
 {
     double temp;
@@ -85,16 +70,6 @@ int pointbuffer_resize(struct PointBuffer *buffer, int newsize)
     return SUCCESS;
 }
 
-void print_pointbuffer(const struct PointBuffer *buffer)
-{
-    printf("{\n");
-    for (size_t i = 0; i < buffer->size; ++i) {
-        printf("    ");
-        print_point(buffer->points + i);
-    }
-    printf("}\n");
-}
-
 struct PointSlice* pointslice_from_buffer(const struct PointBuffer *buffer)
 {
     struct PointSlice *slice = (struct PointSlice*)malloc(sizeof(struct PointSlice));
@@ -114,16 +89,6 @@ void pointslice_free(struct PointSlice *slice)
         free(slice->points);
     }
     free(slice);
-}
-
-void print_pointslice(const struct PointSlice *slice)
-{
-    printf("{\n");
-    for (size_t i = slice->start; i < slice->end; ++i) {
-        printf("    ");
-        print_point(slice->points + i);
-    }
-    printf("}\n");
 }
 
 int get_pointslice_size(const struct PointSlice *slice)

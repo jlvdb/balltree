@@ -68,7 +68,6 @@ void attach_childs(struct BallNode *node, struct PointSlice *points, int leafsiz
     int i_split = partial_median_sort(points, split_axis);
     if (i_split == -1) {
         fprintf(stderr, "ERROR: could not determine the median element for the next split");
-        print_pointslice(points);
         return;
     }
 
