@@ -54,7 +54,7 @@ struct PointBuffer* load_data_from_file()
 int main(int argc, char** argv)
 {
     struct Point query_point = create_point_weighted(0.0, 0.0, 0.0, 0.5);
-    double query_radius = 0.8;
+    double query_radius = 0.2;
     int leafsize = 20;
 
     struct PointBuffer *buffer;
@@ -78,8 +78,8 @@ int main(int argc, char** argv)
     // build the ball tree, show the elapsed time
     time = clock();
     tree = balltree_build(buffer, leafsize);
+    pointbuffer_free(buffer);
     if (!tree) {
-        pointbuffer_free(buffer);
         return 1;
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
@@ -104,6 +104,5 @@ int main(int argc, char** argv)
     printf("self found %9.0lf pairs in %7.3lf sec\n", count, elapsed);
 
     balltree_free(tree);
-    pointbuffer_free(buffer);
     return 0;
 }
