@@ -10,9 +10,24 @@
 #define POINT_ACCESS_BY_INDEX(ptr, index) (*((double*)((char*)(ptr) + (index) * sizeof(double))))
 #define SWAP(temp, a, b) do { (temp) = (a); (a) = (b); (b) = (temp); } while (0)
 
-void print_point(const struct Point *point)
+struct Point point_create(double x, double y, double z)
 {
-    printf("{%lf, %lf, %lf}\n", point->x, point->y, point->z);
+    return (struct Point){
+        .x = x,
+        .y = y,
+        .z = z,
+        .weight = 1.0,
+    };
+}
+
+struct Point point_create_weighted(double x, double y, double z, double weight)
+{
+    return (struct Point){
+        .x = x,
+        .y = y,
+        .z = z,
+        .weight = weight,
+    };
 }
 
 void swap_points(struct Point *p1, struct Point *p2)
@@ -21,6 +36,7 @@ void swap_points(struct Point *p1, struct Point *p2)
     SWAP(temp, p1->x, p2->x);
     SWAP(temp, p1->y, p2->y);
     SWAP(temp, p1->z, p2->z);
+    SWAP(temp, p1->weight, p2->weight);
 }
 
 double points_distance2(const struct Point *p1, const struct Point *p2)
@@ -74,45 +90,6 @@ int pointbuffer_resize(struct PointBuffer *buffer, int newsize)
     return SUCCESS;
 }
 
-void print_pointbuffer(const struct PointBuffer *buffer)
-{
-    printf("{\n");
-    for (size_t i = 0; i < buffer->size; ++i) {
-        printf("    ");
-        print_point(buffer->points + i);
-    }
-    printf("}\n");
-}
-
-double count_within_radius(struct PointBuffer *buffer, struct Point *point, double radius) {
-    double radius2 = radius * radius;
-    double counts = 0.0;
-
-    struct Point *points = buffer->points;
-    for (size_t i = 0; i < buffer->size; ++i) {
-        double distance2 = points_distance2(points + i, point);
-        if (distance2 <= radius2) {
-            counts += 1.0;  // we want weights later
-        }
-    }
-    return counts;
-}
-
-double count_within_range(struct PointBuffer *buffer, struct Point *point, double rmin, double rmax) {
-    double rmin2 = rmin * rmin;
-    double rmax2 = rmax * rmax;
-    double counts = 0.0;
-
-    struct Point *points = buffer->points;
-    for (size_t i = 0; i < buffer->size; ++i) {
-        double distance2 = points_distance2(points + i, point);
-        if (rmin2 < distance2 && distance2 <= rmax2) {
-            counts += 1.0;  // we want weights later
-        }
-    }
-    return counts;
-}
-
 struct PointSlice* pointslice_from_buffer(const struct PointBuffer *buffer)
 {
     struct PointSlice *slice = (struct PointSlice*)malloc(sizeof(struct PointSlice));
@@ -132,16 +109,6 @@ void pointslice_free(struct PointSlice *slice)
         free(slice->points);
     }
     free(slice);
-}
-
-void print_pointslice(const struct PointSlice *slice)
-{
-    printf("{\n");
-    for (size_t i = slice->start; i < slice->end; ++i) {
-        printf("    ");
-        print_point(slice->points + i);
-    }
-    printf("}\n");
 }
 
 int get_pointslice_size(const struct PointSlice *slice)
@@ -164,13 +131,7 @@ struct Point get_center_point(const struct PointSlice *slice)
         center_y += (point.y - center_y) / scale;
         center_z += (point.z - center_z) / scale;
     }
-
-    struct Point center = {
-        .x = center_x,
-        .y = center_y,
-        .z = center_z
-    };
-    return center;
+    return point_create(center_x, center_y, center_z);
 }
 
 double get_maxdist_from_center(const struct PointSlice *slice, struct Point *center)

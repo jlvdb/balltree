@@ -1,5 +1,6 @@
 CC = gcc
 CFLAGS = -Iinclude -Wall -O3 -ffast-math
+LDFLAGS = -shared
 SRCDIR = src
 BUILDDIR = build
 BINDIR = bin
@@ -7,13 +8,16 @@ BINDIR = bin
 SRCS = $(wildcard $(SRCDIR)/*.c)
 OBJS = $(patsubst $(SRCDIR)/%.c, $(BUILDDIR)/%.o, $(SRCS))
 
-TARGET = $(BINDIR)/main.out
+LIBDIR = lib
+LIBS = $(LIBDIR)/balltree.so
 
-$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) $^ -o $@
+all: $(LIBS)
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(LIBS): $(OBJS)
+	$(CC) $(LDFLAGS) $^ -o $@
 
 clean:
 	rm -rf $(BUILDDIR)/*.o $(BINDIR)/*

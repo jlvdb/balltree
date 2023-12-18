@@ -3,20 +3,24 @@
 
 #include "point.h"
 
-struct BallTree {
+struct BallNode {
     struct Point center;
     double radius;
-    struct BallTree *left;
-    struct BallTree *right;
-    struct PointBuffer data;
+    struct BallNode *left;
+    struct BallNode *right;
+    struct PointSlice data;
 };
 
-int balltree_is_leaf(const struct BallTree*);
+struct BallTree {
+    struct BallNode *root;
+    struct PointBuffer data;
+    int leafsize;
+};
+
 void balltree_free(struct BallTree*);
-void balltree_print(const struct BallTree*);
-struct BallTree* balltree_build_recursive(struct PointSlice*, int);
-struct BallTree* balltree_build(struct PointBuffer*, int);
-double balltree_count_radius(struct BallTree*, struct Point*, double);
-double balltree_count_range(struct BallTree*, struct Point*, double, double);
+struct BallTree* balltree_build(const struct PointBuffer*, int);
+double balltree_count_radius(const struct BallTree*, const struct Point*, double);
+double balltree_count_range(const struct BallTree*, const struct Point*, double, double);
+double balltree_dualcount_radius(const struct BallTree*, const struct BallTree*, double);
 
 #endif /* BALLTREE_H */
