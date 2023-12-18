@@ -2,6 +2,9 @@ import numpy as np
 cimport numpy as np
 from libc.stdlib cimport malloc, free
 
+from cython cimport cast
+from numpy.typing import NDArray
+
 
 cdef extern from "../include/point.h":
     cdef struct Point:
@@ -42,6 +45,8 @@ cdef extern from "../include/balltree.h":
     double balltree_count_radius(BallTree*, Point*, double)
     double balltree_count_range(BallTree*, Point*, double, double)
     double balltree_dualcount_radius(BallTree*, BallTree*, double)
+    int balltree_to_file(BallTree*, char*);
+    BallTree* balltree_from_file(char*);
 
 
 cdef class BallTreeWrapped:
@@ -49,9 +54,9 @@ cdef class BallTreeWrapped:
 
     def __cinit__(
         self,
-        np.ndarray[np.double_t, ndim=1] x,
-        np.ndarray[np.double_t, ndim=1] y,
-        np.ndarray[np.double_t, ndim=1] z,
+        np.ndarray[np.double_t, ndim=1] x=None,
+        np.ndarray[np.double_t, ndim=1] y=None,
+        np.ndarray[np.double_t, ndim=1] z=None,
         np.ndarray[np.double_t, ndim=1] weight=None,
         int leafsize=20,
     ):
@@ -77,11 +82,44 @@ cdef class BallTreeWrapped:
             raise RuntimeError("failed to allocate and build tree structure")
 
     def __dealloc__(self):
-        balltree_free(self._tree)
+        if self._tree is not NULL:
+            balltree_free(self._tree)
 
-    def count_radius(self, x: float, y: float, z: float, weight: float, radius: float) -> float:
-        cdef Point point = Point(x, y, z, weight)
-        return balltree_count_radius(self._tree, &point, radius)
+    def count_radius(self, point: NDArray[np.double], radius: float, weight: float | None = None) -> float:
+        x, y, z = point
+        if weight is None:
+            weight = 1.0
+        cdef Point qpoint = Point(x, y, z, weight)
+        return balltree_count_radius(self._tree, &qpoint, radius)
 
     def dualcount_radius(self, other: BallTreeWrapped, radius: float) -> float:
         return balltree_dualcount_radius(self._tree, other._tree, radius)
+
+    def serialize(self, path: str):
+        balltree_to_file(self._tree, path.encode("utf-8"))
+
+
+cdef class BallTreeWrapped2:
+    cdef BallTree *_tree
+
+    def __cinit__(self, path: str):
+        self._tree = balltree_from_file(path.encode("utf-8"))
+        if self._tree is NULL:
+            raise RuntimeError("failed to allocate and build tree structure")
+
+    def __dealloc__(self):
+        if self._tree is not NULL:
+            balltree_free(self._tree)
+
+    def count_radius(self, point: NDArray[np.double], radius: float, weight: float | None = None) -> float:
+        x, y, z = point
+        if weight is None:
+            weight = 1.0
+        cdef Point qpoint = Point(x, y, z, weight)
+        return balltree_count_radius(self._tree, &qpoint, radius)
+
+    def dualcount_radius(self, other: BallTreeWrapped, radius: float) -> float:
+        return balltree_dualcount_radius(self._tree, other._tree, radius)
+
+    def serialize(self, path: str):
+        balltree_to_file(self._tree, path.encode("utf-8"))

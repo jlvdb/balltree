@@ -22,5 +22,7 @@ struct BallTree* balltree_build(const struct PointBuffer*, int);
 double balltree_count_radius(const struct BallTree*, const struct Point*, double);
 double balltree_count_range(const struct BallTree*, const struct Point*, double, double);
 double balltree_dualcount_radius(const struct BallTree*, const struct BallTree*, double);
+int balltree_to_file(const struct BallTree*, const char*);
+struct BallTree* balltree_from_file(const char*);
 
 #endif /* BALLTREE_H */

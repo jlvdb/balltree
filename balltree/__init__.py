@@ -1,1 +1,1 @@
-from .balltree import BallTreeWrapped as BallTree
+from .balltree import BallTreeWrapped as BallTree, BallTreeWrapped2 as BallTree2
