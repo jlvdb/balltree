@@ -5,6 +5,9 @@
 #include "point.h"
 #include "balltree.h"
 
+#define SUCCESS 1
+#define FAILED  0
+
 #define TRUE  1
 #define FALSE 0
 
@@ -105,7 +108,19 @@ struct BallNode* ballnode_build_recursive(struct PointSlice *slice, int leafsize
     return node;
 }
 
-double sum_weights(struct PointSlice *slice)
+int ballnode_count_nodes(const struct BallNode *node)
+{
+    int count = 1;
+    if (node->left) {
+        count += ballnode_count_nodes(node->left);
+    }
+    if (node->right) {
+        count += ballnode_count_nodes(node->right);
+    }
+    return count;
+}
+
+double sum_weights(const struct PointSlice *slice)
 {
     double sumw = 0.0;
     struct Point *points = slice->points;
@@ -116,7 +131,7 @@ double sum_weights(struct PointSlice *slice)
     return sumw;
 }
 
-double sum_weights_within_radius2(struct PointSlice *slice, const struct Point *point, double radius2)
+double sum_weights_within_radius2(const struct PointSlice *slice, const struct Point *point, double radius2)
 {
     double sumw = 0.0;
     struct Point *points = slice->points;
@@ -130,7 +145,7 @@ double sum_weights_within_radius2(struct PointSlice *slice, const struct Point *
     return sumw;
 }
 
-double ballnode_count_radius(struct BallNode *node, struct Point *point, double radius)
+double ballnode_count_radius(const struct BallNode *node, const struct Point *point, double radius)
 {
     double distance = points_distance(&node->center, point);
     double node_radius = node->radius;
@@ -152,7 +167,7 @@ double ballnode_count_radius(struct BallNode *node, struct Point *point, double 
     return 0.0;
 }
 
-double sum_weights_within_range2(struct PointSlice *slice, const struct Point *point, double rmin2, double rmax2)
+double sum_weights_within_range2(const struct PointSlice *slice, const struct Point *point, double rmin2, double rmax2)
 {
     double sumw = 0.0;
     struct Point *points = slice->points;
@@ -166,7 +181,7 @@ double sum_weights_within_range2(struct PointSlice *slice, const struct Point *p
     return sumw;
 }
 
-double ballnode_count_range(struct BallNode *node, struct Point *point, double rmin, double rmax)
+double ballnode_count_range(const struct BallNode *node, const struct Point *point, double rmin, double rmax)
 {
     double distance = points_distance(&node->center, point);
     double node_radius = node->radius;
@@ -188,7 +203,7 @@ double ballnode_count_range(struct BallNode *node, struct Point *point, double r
     return 0.0;
 }
 
-double dualsum_weights_within_radius2(struct PointSlice *slice1, struct PointSlice *slice2, double radius2)
+double dualsum_weights_within_radius2(const struct PointSlice *slice1, const struct PointSlice *slice2, double radius2)
 {
     double sumw = 0.0;
     struct Point *points1 = slice1->points;
@@ -199,7 +214,7 @@ double dualsum_weights_within_radius2(struct PointSlice *slice1, struct PointSli
     return sumw;
 }
 
-double ballnode_dualcount_radius(struct BallNode *node1, struct BallNode *node2, double radius)
+double ballnode_dualcount_radius(const struct BallNode *node1, const struct BallNode *node2, double radius)
 {
     double distance = points_distance(&node1->center, &node2->center);
     double node1_radius = node1->radius;
@@ -236,7 +251,7 @@ double ballnode_dualcount_radius(struct BallNode *node1, struct BallNode *node2,
 
 // public interface
 
-struct BallTree* balltree_build(struct PointBuffer *buffer, int leafsize)
+struct BallTree* balltree_build(const struct PointBuffer *buffer, int leafsize)
 {
     struct BallTree *tree = (struct BallTree*)malloc(sizeof(struct BallTree));
     if (!tree) {
@@ -277,17 +292,23 @@ void balltree_free(struct BallTree *tree)
     tree = NULL;
 }
 
-double balltree_count_radius(struct BallTree *tree, struct Point *point, double radius)
+double balltree_count_radius(const struct BallTree *tree, const struct Point *point, double radius)
 {
     return ballnode_count_radius(tree->root, point, radius);
 }
 
-double balltree_count_range(struct BallTree *tree, struct Point *point, double rmin, double rmax)
+double balltree_count_range(const struct BallTree *tree, const struct Point *point, double rmin, double rmax)
 {
     return ballnode_count_range(tree->root, point, rmin, rmax);
 }
 
-double balltree_dualcount_radius(struct BallTree *tree1, struct BallTree *tree2, double radius)
+double balltree_dualcount_radius(const struct BallTree *tree1, const struct BallTree *tree2, double radius)
 {
     return ballnode_dualcount_radius(tree1->root, tree2->root, radius);
 }
+
+int balltree_count_nodes(const struct BallTree *tree)
+{
+    return ballnode_count_nodes(tree->root);
+}
+

@@ -23,6 +23,8 @@ struct PointSlice {
     struct Point *points;
 };
 
+struct Point point_create(double x, double y, double z);
+struct Point point_create_weighted(double x, double y, double z, double weight);
 double points_distance(const struct Point*, const struct Point*);
 double points_distance2(const struct Point*, const struct Point*);
 

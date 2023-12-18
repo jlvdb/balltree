@@ -10,6 +10,26 @@
 #define POINT_ACCESS_BY_INDEX(ptr, index) (*((double*)((char*)(ptr) + (index) * sizeof(double))))
 #define SWAP(temp, a, b) do { (temp) = (a); (a) = (b); (b) = (temp); } while (0)
 
+struct Point point_create(double x, double y, double z)
+{
+    return (struct Point){
+        .x = x,
+        .y = y,
+        .z = z,
+        .weight = 1.0,
+    };
+}
+
+struct Point point_create_weighted(double x, double y, double z, double weight)
+{
+    return (struct Point){
+        .x = x,
+        .y = y,
+        .z = z,
+        .weight = weight,
+    };
+}
+
 void swap_points(struct Point *p1, struct Point *p2)
 {
     double temp;
@@ -111,13 +131,7 @@ struct Point get_center_point(const struct PointSlice *slice)
         center_y += (point.y - center_y) / scale;
         center_z += (point.z - center_z) / scale;
     }
-
-    struct Point center = {
-        .x = center_x,
-        .y = center_y,
-        .z = center_z
-    };
-    return center;
+    return point_create(center_x, center_y, center_z);
 }
 
 double get_maxdist_from_center(const struct PointSlice *slice, struct Point *center)

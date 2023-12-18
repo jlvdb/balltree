@@ -18,9 +18,9 @@ struct BallTree {
 };
 
 void balltree_free(struct BallTree*);
-struct BallTree* balltree_build(struct PointBuffer*, int);
-double balltree_count_radius(struct BallTree*, struct Point*, double);
-double balltree_count_range(struct BallTree*, struct Point*, double, double);
-double balltree_dualcount_radius(struct BallTree*, struct BallTree*, double);
+struct BallTree* balltree_build(const struct PointBuffer*, int);
+double balltree_count_radius(const struct BallTree*, const struct Point*, double);
+double balltree_count_range(const struct BallTree*, const struct Point*, double, double);
+double balltree_dualcount_radius(const struct BallTree*, const struct BallTree*, double);
 
 #endif /* BALLTREE_H */
