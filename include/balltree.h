@@ -10,7 +10,8 @@ struct BallTree {
     int leafsize;
 };
 
-struct BallTree* balltree_build(const struct PointBuffer*, int);
+struct BallTree* balltree_build(const struct PointBuffer*);
+struct BallTree* balltree_build_leafsize(const struct PointBuffer*, int);
 void balltree_free(struct BallTree*);
 int balltree_count_nodes(const struct BallTree*);
 int balltree_to_file(const struct BallTree*, const char*);

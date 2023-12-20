@@ -9,13 +9,15 @@
 #define SUCCESS 1
 #define FAILED  0
 
+#define DEFAULT_LEAFSIZE 20
+
 struct FileHeader {
     int leafsize;
     int num_nodes;
     int num_points;
 };
 
-struct BallTree* balltree_build(const struct PointBuffer *buffer, int leafsize)
+struct BallTree* balltree_build_leafsize(const struct PointBuffer *buffer, int leafsize)
 {
     struct BallTree *tree = (struct BallTree*)malloc(sizeof(struct BallTree));
     if (!tree) {
@@ -42,6 +44,11 @@ struct BallTree* balltree_build(const struct PointBuffer *buffer, int leafsize)
         return NULL;
     }
     return tree;
+}
+
+struct BallTree* balltree_build(const struct PointBuffer *buffer)
+{
+    return balltree_build_leafsize(buffer, DEFAULT_LEAFSIZE);
 }
 
 void balltree_free(struct BallTree *tree)
