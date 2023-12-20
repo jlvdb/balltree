@@ -77,7 +77,7 @@ int main(int argc, char** argv)
 
     // build the ball tree, show the elapsed time
     time = clock();
-    tree = balltree_build(buffer, leafsize);
+    tree = balltree_build_leafsize(buffer, leafsize);
     pointbuffer_free(buffer);
     if (!tree) {
         return 1;
