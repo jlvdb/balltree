@@ -56,14 +56,14 @@ struct PointBuffer* pointbuffer_create(int size)
 {
     struct PointBuffer *buffer = (struct PointBuffer*)malloc(sizeof(struct PointBuffer));
     if (!buffer) {
-        fprintf(stderr, "ERROR: memory allocation failed");
+        fprintf(stderr, "ERROR: memory allocation failed\n");
         return NULL;
     }
 
     size_t n_bytes = size * sizeof(struct Point);
     buffer->points = (struct Point*)malloc(n_bytes);
     if (!buffer->points) {
-        fprintf(stderr, "ERROR: memory allocation failed");
+        fprintf(stderr, "ERROR: memory allocation failed\n");
         free(buffer);
         return NULL;
     }
@@ -94,7 +94,7 @@ struct PointSlice* pointslice_from_buffer(const struct PointBuffer *buffer)
 {
     struct PointSlice *slice = (struct PointSlice*)malloc(sizeof(struct PointSlice));
     if (!slice) {
-        fprintf(stderr, "ERROR: memory allocation failed");
+        fprintf(stderr, "ERROR: memory allocation failed\n");
         return NULL;
     }
     slice->start = 0;
