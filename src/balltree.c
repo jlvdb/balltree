@@ -11,10 +11,15 @@
 
 #define DEFAULT_LEAFSIZE 20
 
+struct SectionHeader {
+    int size;
+    int bytes;
+};
+
 struct FileHeader {
     int leafsize;
-    int num_nodes;
-    int num_points;
+    struct SectionHeader nodes;
+    struct SectionHeader points;
 };
 
 struct BallTree* balltree_build_leafsize(const struct PointBuffer *buffer, int leafsize)
@@ -78,10 +83,18 @@ int balltree_to_file(const struct BallTree *tree, const char *path)
     }
 
     // write the header
+    int num_nodes = balltree_count_nodes(tree);
+    int num_points = tree->data.size;
     struct FileHeader header = {
         .leafsize = tree->leafsize,
-        .num_nodes = balltree_count_nodes(tree),
-        .num_points = tree->data.size,
+        .nodes = {
+            .size = num_nodes,
+            .bytes = num_nodes * sizeof(struct BallNodeSerialized)
+        },
+        .points = {
+            .size = num_points,
+            .bytes = num_points * sizeof(struct Point)
+        },
     };
     elements_written = fwrite(&header, sizeof(struct FileHeader), 1, file);
     if (elements_written != 1) {
@@ -90,8 +103,8 @@ int balltree_to_file(const struct BallTree *tree, const char *path)
     }
 
     // append serialised point buffer
-    elements_written = fwrite(tree->data.points, sizeof(struct Point), header.num_points, file);
-    if (elements_written != header.num_points) {
+    elements_written = fwrite(tree->data.points, sizeof(struct Point), header.points.size, file);
+    if (elements_written != header.points.size) {
         fprintf(stderr, "ERROR: failed to write data points\n");
         goto close_file;
     }
@@ -99,11 +112,10 @@ int balltree_to_file(const struct BallTree *tree, const char *path)
     // serialise nodes
     int index_tracker = 1;  // 0 is already reserved for root node
     struct BallNodeBuffer node_buffer = {
-        .size = header.num_nodes,
+        .size = header.nodes.size,
         .next_free = &index_tracker,
     };
-    size_t n_bytes = header.num_nodes * sizeof(struct BallNodeSerialized);
-    node_buffer.buffer = (struct BallNodeSerialized*)malloc(n_bytes);
+    node_buffer.buffer = (struct BallNodeSerialized*)malloc(header.nodes.bytes);
     if (!node_buffer.buffer) {
         fprintf(stderr, "ERROR: failed to allocate memory for serialized node data\n");
         goto close_file;
@@ -114,9 +126,9 @@ int balltree_to_file(const struct BallTree *tree, const char *path)
     }
 
     // append serialised nodes
-    elements_written = fwrite(node_buffer.buffer, sizeof(struct BallNodeSerialized), header.num_nodes, file);
+    elements_written = fwrite(node_buffer.buffer, sizeof(struct BallNodeSerialized), header.nodes.size, file);
     free(node_buffer.buffer);
-    if (elements_written != header.num_nodes) {
+    if (elements_written != header.nodes.size) {
         fprintf(stderr, "ERROR: failed to write node data\n");
         goto close_file;
     }
@@ -143,7 +155,7 @@ struct BallTree* balltree_from_file(const char *path)
     FILE *file = fopen(path, "rb");
     if (file == NULL) {
         fprintf(stderr, "ERROR: failed to open file\n");
-        goto close_file;
+        return NULL;
     }
 
     // read header
@@ -159,42 +171,42 @@ struct BallTree* balltree_from_file(const char *path)
         fprintf(stderr, "ERROR: failed to allocate tree\n");
         goto dealloc_tree;
     }
-    struct Point *points = (struct Point*)malloc(header.num_points * sizeof(struct Point));
+    struct Point *points = (struct Point*)malloc(header.points.bytes);
     if (!points) {
         fprintf(stderr, "ERROR: failed to allocate point buffer\n");
-        goto dealloc_points;
+        goto dealloc_tree;
     }
     tree->data = (struct PointBuffer){
-        .size = header.num_points,
+        .size = header.points.size,
         .points = points,
     };
 
     // read point buffer
-    elements_read = fread(points, sizeof(struct Point), header.num_points, file);
-    if (elements_read != header.num_points) {
+    elements_read = fread(points, sizeof(struct Point), header.points.size, file);
+    if (elements_read != header.points.size) {
         fprintf(stderr, "ERROR: failed to read data points\n");
         goto dealloc_points;
     }
 
     // read node data
-    size_t n_bytes = header.num_nodes * sizeof(struct BallNodeSerialized);
-    struct BallNodeSerialized *node_buffer = (struct BallNodeSerialized *)malloc(n_bytes);
+    struct BallNodeSerialized *node_buffer = (struct BallNodeSerialized *)malloc(header.nodes.bytes);
     if (!node_buffer) {
         fprintf(stderr, "ERROR: failed to allocate node data\n");
-        goto dealloc_nodes;
-    }
-    elements_read = fread(node_buffer, sizeof(struct BallNodeSerialized), header.num_nodes, file);
-    if (elements_read != header.num_nodes) {
-        fprintf(stderr, "ERROR: failed to read node data\n");
         goto dealloc_points;
     }
+    elements_read = fread(node_buffer, sizeof(struct BallNodeSerialized), header.nodes.size, file);
+    if (elements_read != header.nodes.size) {
+        fprintf(stderr, "ERROR: failed to read node data\n");
+        goto dealloc_nodes;
+    }
 
-    tree->root = ballnode_deserialise_recursive(node_buffer, header.num_nodes, &tree->data, 0);
+    tree->root = ballnode_deserialise_recursive(node_buffer, header.nodes.size, &tree->data, 0);
     if (!tree->root) {
         fprintf(stderr, "ERROR: failed to reconstruct tree\n");
         goto dealloc_nodes;
     }
 
+    fclose(file);
     return tree;
 
     // alternative exit route which cleans up buffers
@@ -203,7 +215,7 @@ dealloc_nodes:
 dealloc_points:
     free(points);
 dealloc_tree:
-    balltree_free(tree);
+    free(tree);
 close_file:
     fclose(file);
     return NULL;
