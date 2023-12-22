@@ -109,13 +109,16 @@ int main(int argc, char** argv)
         balltree_free(tree);
         return 1;
     }
+    elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
+    printf("dumped   in %7.3lf ms\n", elapsed);
+    time = clock();
     struct BallTree *tree2 = balltree_from_file("testing/tree.dump");
     if (!tree2) {
         balltree_free(tree); 
         return 1;  
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
-    printf("dumped and restored in %7.3lf ms\n", elapsed);
+    printf("restored in %7.3lf ms\n", elapsed);
 
     balltree_free(tree2);
     balltree_free(tree);

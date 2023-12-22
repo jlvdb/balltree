@@ -166,40 +166,43 @@ struct BallTree* balltree_from_file(const char *path)
         goto close_file;
     }
 
+    // allocate all memory required
     struct BallTree *tree = (struct BallTree*)malloc(sizeof(struct BallTree));
     if (!tree) {
         fprintf(stderr, "ERROR: failed to allocate tree\n");
-        goto dealloc_tree;
+        goto close_file;
     }
     struct Point *points = (struct Point*)malloc(header.points.bytes);
     if (!points) {
         fprintf(stderr, "ERROR: failed to allocate point buffer\n");
         goto dealloc_tree;
     }
-    tree->data = (struct PointBuffer){
-        .size = header.points.size,
-        .points = points,
-    };
-
-    // read point buffer
-    elements_read = fread(points, sizeof(struct Point), header.points.size, file);
-    if (elements_read != header.points.size) {
-        fprintf(stderr, "ERROR: failed to read data points\n");
-        goto dealloc_points;
-    }
-
-    // read node data
     struct BallNodeSerialized *node_buffer = (struct BallNodeSerialized *)malloc(header.nodes.bytes);
     if (!node_buffer) {
         fprintf(stderr, "ERROR: failed to allocate node data\n");
         goto dealloc_points;
     }
+
+    // read point buffer
+    elements_read = fread(points, sizeof(struct Point), header.points.size, file);
+    if (elements_read != header.points.size) {
+        fprintf(stderr, "ERROR: failed to read data points\n");
+        goto dealloc_nodes;
+    }
+
+    // read node data
     elements_read = fread(node_buffer, sizeof(struct BallNodeSerialized), header.nodes.size, file);
     if (elements_read != header.nodes.size) {
         fprintf(stderr, "ERROR: failed to read node data\n");
         goto dealloc_nodes;
     }
 
+    // populate the tree
+    tree->leafsize = header.leafsize;
+    tree->data = (struct PointBuffer){
+        .size = header.points.size,
+        .points = points,
+    };
     tree->root = ballnode_deserialise_recursive(node_buffer, header.nodes.size, &tree->data, 0);
     if (!tree->root) {
         fprintf(stderr, "ERROR: failed to reconstruct tree\n");
