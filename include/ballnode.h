@@ -6,6 +6,7 @@
 struct BallNode {
     struct Point center;
     double radius;
+    double sum_weight;
     struct BallNode *left;
     struct BallNode *right;
     struct PointSlice data;
@@ -14,6 +15,7 @@ struct BallNode {
 struct BallNodeSerialized {
     double center_x, center_y, center_z;
     double radius;
+    double sum_weight;
     int left, right;  // struct BallNode*
     int data_start, data_end;  // struct PointSlice
 };

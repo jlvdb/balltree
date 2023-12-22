@@ -75,6 +75,17 @@ void attach_childs(struct BallNode *node, struct PointSlice *points, int leafsiz
     }
 }
 
+double sum_weights(const struct PointSlice *slice)
+{
+    double sumw = 0.0;
+    struct Point *points = slice->points;
+    for (size_t i = slice->start; i < slice->end; ++i) {
+        struct Point *point_i = points + i;
+        sumw += point_i->weight;
+    }
+    return sumw;
+}
+
 struct BallNode* ballnode_build_recursive(struct PointSlice *slice, int leafsize)
 {
     int size = get_pointslice_size(slice);
@@ -86,6 +97,7 @@ struct BallNode* ballnode_build_recursive(struct PointSlice *slice, int leafsize
 
     struct BallNode *node = ballnode_create_node(center, radius, slice);
     if (size <= leafsize) {
+        node->sum_weight = sum_weights(&node->data);
         return node;
     }
 
@@ -95,6 +107,7 @@ struct BallNode* ballnode_build_recursive(struct PointSlice *slice, int leafsize
     if (!node->left || !node->right) {
         return NULL;
     }
+    node->sum_weight = node->left->sum_weight + node->right->sum_weight;
     return node;
 }
 
@@ -108,17 +121,6 @@ int ballnode_count_nodes(const struct BallNode *node)
         count += ballnode_count_nodes(node->right);
     }
     return count;
-}
-
-double sum_weights(const struct PointSlice *slice)
-{
-    double sumw = 0.0;
-    struct Point *points = slice->points;
-    for (size_t i = slice->start; i < slice->end; ++i) {
-        struct Point *point_i = points + i;
-        sumw += point_i->weight;
-    }
-    return sumw;
 }
 
 double sum_weights_within_radius2(const struct PointSlice *slice, const struct Point *point, double radius2)
@@ -141,7 +143,7 @@ double ballnode_count_radius(const struct BallNode *node, const struct Point *po
     double node_radius = node->radius;
     if (distance <= radius - node_radius) {
         // all points are pairs, stop distance evaluation
-        return point->weight * sum_weights(&node->data);;
+        return point->weight * node->sum_weight;
     } else if (distance <= radius + node_radius) {
         // some points may be pairs
         if (ballnode_is_leaf(node)) {
@@ -177,7 +179,7 @@ double ballnode_count_range(const struct BallNode *node, const struct Point *poi
     double node_radius = node->radius;
     if (rmin + node_radius < distance && distance <= rmax - node_radius) {
         // all points are pairs, stop distance evaluation
-        return point->weight * sum_weights(&node->data);;
+        return point->weight * node->sum_weight;
     } else if (rmin - node_radius < distance || distance <= rmax + node_radius) {
         // some points may be pairs
         if (ballnode_is_leaf(node)) {
@@ -211,7 +213,7 @@ double ballnode_dualcount_radius(const struct BallNode *node1, const struct Ball
     double node2_radius = node2->radius;
     if (distance <= radius - node1_radius - node2_radius) {
         // all points are pairs, stop distance evaluation
-        return sum_weights(&node1->data) * sum_weights(&node2->data);;
+        return node1->sum_weight * node2->sum_weight;
     } else if (distance <= radius + node1_radius + node2_radius) {
         // some points may be pairs
         int node1_is_leaf = ballnode_is_leaf(node1);
@@ -259,6 +261,7 @@ int ballnode_serialise_recursive(struct BallNodeBuffer buffer, struct BallNode *
         .center_y = node->center.y,
         .center_z = node->center.z,
         .radius = node->radius,
+        .sum_weight = node->sum_weight,
         .left = index_left,
         .right = index_right,
         .data_start = node->data.start,
@@ -295,6 +298,7 @@ struct BallNode* ballnode_deserialise_recursive(struct BallNodeSerialized *buffe
     }
     node->center = point_create(serialized->center_x, serialized->center_y, serialized->center_z);
     node->radius = serialized->radius;
+    node->sum_weight = serialized->sum_weight;
     node->data = (struct PointSlice){
         .start = serialized->data_start,
         .end = serialized->data_end,
