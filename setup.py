@@ -5,7 +5,7 @@ import numpy as np
 ext_modules = [
     Extension(
         name="balltree.balltree",
-        sources=["cython/wrapper.pyx", "src/point.c", "src/balltree.c"],
+        sources=["cython/wrapper.pyx", "src/point.c", "src/ballnode.c", "src/balltree.c"],
         extra_compile_args=["-O3", "-march=native", "-funroll-all-loops", "-ffast-math"]
     ),
 ]
