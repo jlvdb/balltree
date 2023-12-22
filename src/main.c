@@ -97,6 +97,16 @@ int main(int argc, char** argv)
         imax *= 10;
     }
 
+    // query all points, show the elapsed time
+    time = clock();
+    count = 0.0;
+    for (int i = 0; i < buffer->size; ++i) {
+        count += balltree_count_radius(tree, buffer->points + i, query_radius);
+    }
+    count = balltree_dualcount_radius(tree, tree, query_radius);
+    elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
+    printf(" all found %9.0lf pairs in %7.3lf sec\n", count, elapsed);
+
     // query with itself, show the elapsed time
     time = clock();
     count = balltree_dualcount_radius(tree, tree, query_radius);
