@@ -78,7 +78,6 @@ int main(int argc, char** argv)
     // build the ball tree, show the elapsed time
     time = clock();
     tree = balltree_build_leafsize(buffer, leafsize);
-    pointbuffer_free(buffer);
     if (!tree) {
         return 1;
     }
@@ -103,7 +102,6 @@ int main(int argc, char** argv)
     for (int i = 0; i < buffer->size; ++i) {
         count += balltree_count_radius(tree, buffer->points + i, query_radius);
     }
-    count = balltree_dualcount_radius(tree, tree, query_radius);
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
     printf(" all found %9.0lf pairs in %7.3lf sec\n", count, elapsed);
 
@@ -116,6 +114,7 @@ int main(int argc, char** argv)
     // dump and restore
     time = clock();
     if (!balltree_to_file(tree, "testing/tree.dump")) {
+        pointbuffer_free(buffer);
         balltree_free(tree);
         return 1;
     }
@@ -124,12 +123,14 @@ int main(int argc, char** argv)
     time = clock();
     struct BallTree *tree2 = balltree_from_file("testing/tree.dump");
     if (!tree2) {
+        pointbuffer_free(buffer);
         balltree_free(tree); 
         return 1;  
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
     printf("restored in %7.3lf ms\n", elapsed);
 
+    pointbuffer_free(buffer);
     balltree_free(tree2);
     balltree_free(tree);
     return 0;
