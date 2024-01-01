@@ -8,7 +8,6 @@
 #define FAILED  0
 
 #define POINT_ACCESS_BY_INDEX(ptr, index) (*((double*)((char*)(ptr) + (index) * sizeof(double))))
-#define SWAP(temp, a, b) do { (temp) = (a); (a) = (b); (b) = (temp); } while (0)
 
 struct Point point_create(double x, double y, double z)
 {
@@ -32,11 +31,9 @@ struct Point point_create_weighted(double x, double y, double z, double weight)
 
 void swap_points(struct Point *p1, struct Point *p2)
 {
-    double temp;
-    SWAP(temp, p1->x, p2->x);
-    SWAP(temp, p1->y, p2->y);
-    SWAP(temp, p1->z, p2->z);
-    SWAP(temp, p1->weight, p2->weight);
+    struct Point temp = *p1;
+    *p1 = *p2;
+    *p2 = temp;
 }
 
 double points_distance2(const struct Point *p1, const struct Point *p2)
