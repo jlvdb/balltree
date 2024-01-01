@@ -13,13 +13,16 @@
 
 struct BallNode* ballnode_create_node(struct Point center, double radius, const struct PointSlice *slice)
 {
-    struct BallNode *node = (struct BallNode*)calloc(1, sizeof(struct BallNode));
+    struct BallNode *node = (struct BallNode*)malloc(sizeof(struct BallNode));
     if (!node) {
         fprintf(stderr, "ERROR: BallNode node allocation failed\n");
         return NULL;
     }
     node->center = center;
     node->radius = radius;
+    node->sum_weight = 0.0;
+    node->left = NULL;
+    node->right = NULL;
     node->data = (struct PointSlice){
         .start = slice->start,
         .end = slice->end,
@@ -28,7 +31,7 @@ struct BallNode* ballnode_create_node(struct Point center, double radius, const 
     return node;
 }
 
-int ballnode_is_leaf(const struct BallNode *node)
+inline int ballnode_is_leaf(const struct BallNode *node)
 {
     if (node->left && node->right) {
         return FALSE;
@@ -39,12 +42,8 @@ int ballnode_is_leaf(const struct BallNode *node)
 void ballnode_free(struct BallNode *node)
 {
     if (!ballnode_is_leaf(node)) {
-        if (node->left) {
-            ballnode_free(node->left);
-        }
-        if (node->right) {
-            ballnode_free(node->right);
-        }
+        ballnode_free(node->left);
+        ballnode_free(node->right);
     }
     free(node);
 }
@@ -96,6 +95,7 @@ struct BallNode* ballnode_build_recursive(struct PointSlice *slice, int leafsize
     double radius = get_maxdist_from_center(slice, &center);
 
     struct BallNode *node = ballnode_create_node(center, radius, slice);
+    // TODO: check null pointer
     if (size <= leafsize) {
         node->sum_weight = sum_weights(&node->data);
         return node;
@@ -104,6 +104,7 @@ struct BallNode* ballnode_build_recursive(struct PointSlice *slice, int leafsize
     if (node) {
         attach_childs(node, slice, leafsize);
     }
+    // TODO: use is_leaf()?
     if (!node->left || !node->right) {
         return NULL;
     }
@@ -140,11 +141,10 @@ double sum_weights_within_radius2(const struct PointSlice *slice, const struct P
 double ballnode_count_radius(const struct BallNode *node, const struct Point *point, double radius)
 {
     double distance = points_distance(&node->center, point);
-    double node_radius = node->radius;
-    if (distance <= radius - node_radius) {
+    if (distance <= radius - node->radius) {
         // all points are pairs, stop distance evaluation
         return point->weight * node->sum_weight;
-    } else if (distance <= radius + node_radius) {
+    } else if (distance <= radius + node->radius) {
         // some points may be pairs
         if (ballnode_is_leaf(node)) {
             // check each point individually
@@ -176,11 +176,10 @@ double sum_weights_within_range2(const struct PointSlice *slice, const struct Po
 double ballnode_count_range(const struct BallNode *node, const struct Point *point, double rmin, double rmax)
 {
     double distance = points_distance(&node->center, point);
-    double node_radius = node->radius;
-    if (rmin + node_radius < distance && distance <= rmax - node_radius) {
+    if (rmin + node->radius < distance && distance <= rmax - node->radius) {
         // all points are pairs, stop distance evaluation
         return point->weight * node->sum_weight;
-    } else if (rmin - node_radius < distance || distance <= rmax + node_radius) {
+    } else if (rmin - node->radius < distance || distance <= rmax + node->radius) {
         // some points may be pairs
         if (ballnode_is_leaf(node)) {
             // check each point individually
@@ -209,12 +208,10 @@ double dualsum_weights_within_radius2(const struct PointSlice *slice1, const str
 double ballnode_dualcount_radius(const struct BallNode *node1, const struct BallNode *node2, double radius)
 {
     double distance = points_distance(&node1->center, &node2->center);
-    double node1_radius = node1->radius;
-    double node2_radius = node2->radius;
-    if (distance <= radius - node1_radius - node2_radius) {
+    if (distance <= radius - node1->radius - node2->radius) {
         // all points are pairs, stop distance evaluation
         return node1->sum_weight * node2->sum_weight;
-    } else if (distance <= radius + node1_radius + node2_radius) {
+    } else if (distance <= radius + node1->radius + node2->radius) {
         // some points may be pairs
         int node1_is_leaf = ballnode_is_leaf(node1);
         int node2_is_leaf = ballnode_is_leaf(node2);
@@ -224,12 +221,12 @@ double ballnode_dualcount_radius(const struct BallNode *node1, const struct Ball
             return dualsum_weights_within_radius2(&node1->data, &node2->data, radius * radius);
         }
         // traverse the tree to narrow down the node size
-        if (!node1_is_leaf) {  // node2 is leaf
-            counts += ballnode_dualcount_radius(node1->left, node2, radius);
-            counts += ballnode_dualcount_radius(node1->right, node2, radius);
-        } else if (!node2_is_leaf) {  // node1 is leaf
+        if (node1_is_leaf) {
             counts += ballnode_dualcount_radius(node1, node2->left, radius);
             counts += ballnode_dualcount_radius(node1, node2->right, radius);
+        } else if (node2_is_leaf) {
+            counts += ballnode_dualcount_radius(node1->left, node2, radius);
+            counts += ballnode_dualcount_radius(node1->right, node2, radius);
         } else {
             counts += ballnode_dualcount_radius(node1->left, node2->left, radius);
             counts += ballnode_dualcount_radius(node1->left, node2->right, radius);

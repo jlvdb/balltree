@@ -118,12 +118,13 @@ struct Point get_center_point(const struct PointSlice *slice)
     double center_x = 0.0;
     double center_y = 0.0;
     double center_z = 0.0;
-    int total = 1;
+    int total = 0;
 
     struct Point *points = slice->points;
-    for (size_t i = slice->start; i < slice->end; ++i, total++) {
-        struct Point point = points[i];
+    for (size_t i = slice->start; i < slice->end; ++i) {
+        ++total;
         double scale = (double)total;
+        struct Point point = points[i];
         center_x += (point.x - center_x) / scale;
         center_y += (point.y - center_y) / scale;
         center_z += (point.z - center_z) / scale;
@@ -181,15 +182,13 @@ enum Axis get_max_spread_axis(const struct PointSlice *slice)
     double x_spread = x_max - x_min;
     double y_spread = y_max - y_min;
     double z_spread = z_max - z_min;
-    enum Axis axis;
     if (x_spread > y_spread && x_spread > z_spread) {
-        axis = X;
+        return (enum Axis)X;
     } else if (y_spread > z_spread) {
-        axis = Y;
+        return (enum Axis)Y;
     } else {
-        axis = Z;
+        return (enum Axis)Z;
     }
-    return axis;
 }
 
 int partition_points(struct PointSlice *slice, int i_pivot, enum Axis axis)
