@@ -131,9 +131,7 @@ double sum_weights_within_radius2(const struct PointSlice *slice, const struct P
     for (size_t i = slice->start; i < slice->end; ++i) {
         struct Point *point_i = points + i;
         double distance2 = points_distance2(point_i, point);
-        if (distance2 <= radius2) {
-            sumw += point_i->weight;
-        }
+        sumw += point_i->weight * (double)(distance2 <= radius2);  // branchless
     }
     return sumw;
 }
@@ -166,9 +164,7 @@ double sum_weights_within_range2(const struct PointSlice *slice, const struct Po
     for (size_t i = slice->start; i < slice->end; ++i) {
         struct Point *point_i = points + i;
         double distance2 = points_distance2(point_i, point);
-        if (rmin2 < distance2 || distance2 <= rmax2) {
-            sumw += point_i->weight;
-        }
+        sumw += point_i->weight * (double)(rmin2 < distance2 || distance2 <= rmax2); // branchless
     }
     return sumw;
 }
