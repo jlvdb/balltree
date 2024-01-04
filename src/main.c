@@ -5,60 +5,15 @@
 #include "point.h"
 #include "balltree.h"
 
-struct PointBuffer* load_data_from_file()
-{
-    struct PointBuffer *buffer = pointbuffer_create(100);
-    if (!buffer) {
-        fprintf(stderr, "ERROR: memory allocation failed\n");
-        pointbuffer_free(buffer);
-        return NULL;
-    }
+PointBuffer *load_data_from_file();
 
-    static const char filepath[] = "testing/points.txt";
-    FILE *file = fopen(filepath, "r");
-    if (file == NULL) {
-        fprintf(stderr, "ERROR: failed to open file: %s\n", filepath);
-        pointbuffer_free(buffer);
-        return NULL;
-    }
-
-    int n_records = 0;
-    struct Point point = {0.0, 0.0, 0.0, 0.5};
-    while (fscanf(file, "%lf %lf %lf", &point.x, &point.y, &point.z) == 3) {
-        if (n_records == buffer->size) {
-            if (!pointbuffer_resize(buffer, buffer->size * 2)) {
-                fprintf(stderr, "ERROR: failed to expand buffer\n");
-                pointbuffer_free(buffer);
-                fclose(file);
-                return NULL;
-            }
-        }
-        buffer->points[n_records] = point;
-        ++n_records;
-    }
-    fclose(file);
-
-    if (n_records == 0) {
-        fprintf(stderr, "ERROR: could not read any records from file\n");
-        pointbuffer_free(buffer);
-        return NULL;
-    }
-    if (!pointbuffer_resize(buffer, n_records)) {
-        fprintf(stderr, "ERROR: memory reallocation failed\n");
-        pointbuffer_free(buffer);
-        return NULL;
-    }
-    return buffer;
-}
-
-int main(int argc, char** argv)
-{
-    struct Point query_point = {0.0, 0.0, 0.0, 0.5};
+int main(int argc, char** argv) {
+    Point query_point = {0.0, 0.0, 0.0, 0.5};
     double query_radius = 0.2;
     int leafsize = 20;
 
-    struct PointBuffer *buffer;
-    struct BallTree *tree;
+    PointBuffer *buffer;
+    BallTree *tree;
     double count;
 
     clock_t time;
@@ -79,6 +34,7 @@ int main(int argc, char** argv)
     time = clock();
     tree = balltree_build_leafsize(buffer, leafsize);
     if (!tree) {
+        pointbuffer_free(buffer);
         return 1;
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
@@ -121,7 +77,7 @@ int main(int argc, char** argv)
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
     printf("dumped   in %7.3lf ms\n", elapsed);
     time = clock();
-    struct BallTree *tree2 = balltree_from_file("testing/tree.dump");
+    BallTree *tree2 = balltree_from_file("testing/tree.dump");
     if (!tree2) {
         pointbuffer_free(buffer);
         balltree_free(tree); 
@@ -134,4 +90,50 @@ int main(int argc, char** argv)
     balltree_free(tree2);
     balltree_free(tree);
     return 0;
+}
+
+
+PointBuffer *load_data_from_file() {
+    PointBuffer *buffer = pointbuffer_new(256);
+    if (!buffer) {
+        fprintf(stderr, "ERROR: memory allocation failed\n");
+        pointbuffer_free(buffer);
+        return NULL;
+    }
+
+    static const char filepath[] = "testing/points.txt";
+    FILE *file = fopen(filepath, "r");
+    if (file == NULL) {
+        fprintf(stderr, "ERROR: failed to open file: %s\n", filepath);
+        pointbuffer_free(buffer);
+        return NULL;
+    }
+
+    int n_records = 0;
+    Point point = {0.0, 0.0, 0.0, 0.5};
+    while (fscanf(file, "%lf %lf %lf", &point.x, &point.y, &point.z) == 3) {
+        if (n_records == buffer->size) {
+            if (pointbuffer_resize(buffer, buffer->size * 2) != 0) {
+                fprintf(stderr, "ERROR: failed to expand buffer\n");
+                pointbuffer_free(buffer);
+                fclose(file);
+                return NULL;
+            }
+        }
+        buffer->points[n_records] = point;
+        ++n_records;
+    }
+    fclose(file);
+
+    if (n_records == 0) {
+        fprintf(stderr, "ERROR: could not read any records from file\n");
+        pointbuffer_free(buffer);
+        return NULL;
+    }
+    if (pointbuffer_resize(buffer, n_records) != 0) {
+        fprintf(stderr, "ERROR: memory reallocation failed\n");
+        pointbuffer_free(buffer);
+        return NULL;
+    }
+    return buffer;
 }

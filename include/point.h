@@ -2,42 +2,45 @@
 #define POINT_H
 
 #include <stdlib.h>
+#include <stdio.h>
 
-struct Point {
+typedef struct {
     double x;
     double y;
     double z;
     double weight;
-};
+} Point;
 
-enum Axis {X, Y, Z};  // field to index mapping for struct Point
+enum Axis {X, Y, Z};
 
-struct PointBuffer {
+Point point_create_weighted(double, double, double, double);
+Point point_create(double, double, double);
+double point_dist_squared(const Point *, const Point *);
+double point_dist(const Point *, const Point *);
+
+typedef struct {
     int size;
-    struct Point *points;
-};
+    Point *points;
+} PointBuffer;
 
-struct PointSlice {
+PointBuffer *pointbuffer_new(int);
+void pointbuffer_free(PointBuffer *);
+int pointbuffer_resize(PointBuffer *, int);
+
+typedef struct {
     int start;
     int end;
-    struct Point *points;
-};
+    Point *points;
+} PointSlice;
 
-struct Point point_create(double x, double y, double z);
-struct Point point_create_weighted(double x, double y, double z, double weight);
-double points_distance(const struct Point*, const struct Point*);
-double points_distance2(const struct Point*, const struct Point*);
+PointSlice *pointslice_from_buffer(const PointBuffer *);
+int pointslice_get_size(const PointSlice *);
+int pointslice_update_start(PointSlice *, int);
+int pointslice_update_end(PointSlice *, int);
 
-struct PointBuffer* pointbuffer_create(int);
-void pointbuffer_free(struct PointBuffer*);
-int pointbuffer_resize(struct PointBuffer*, int);
-
-struct PointSlice* pointslice_from_buffer(const struct PointBuffer*);
-void pointslice_free(struct PointSlice*);
-int get_pointslice_size(const struct PointSlice*);
-struct Point get_center_point(const struct PointSlice*);
-double get_maxdist_from_center(const struct PointSlice*, struct Point*);
-enum Axis get_max_spread_axis(const struct PointSlice*);
-int partial_median_sort(struct PointSlice*, enum Axis);
+Point pointslice_get_mean(const PointSlice *);
+double pointslice_get_maxdist(const PointSlice *, Point *);
+enum Axis pointslice_get_maxspread_axis(const PointSlice *);
+int pointslice_median_partition(PointSlice *, enum Axis);
 
 #endif /* POINT_H */

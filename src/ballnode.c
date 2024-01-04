@@ -11,9 +11,8 @@
 #define TRUE  1
 #define FALSE 0
 
-struct BallNode* ballnode_create_node(struct Point center, double radius, const struct PointSlice *slice)
-{
-    struct BallNode *node = (struct BallNode*)malloc(sizeof(struct BallNode));
+BallNode *ballnode_create_node(Point center, double radius, const PointSlice *slice) {
+    BallNode *node = (BallNode *)malloc(sizeof(BallNode));
     if (!node) {
         fprintf(stderr, "ERROR: BallNode node allocation failed\n");
         return NULL;
@@ -23,7 +22,7 @@ struct BallNode* ballnode_create_node(struct Point center, double radius, const 
     node->sum_weight = 0.0;
     node->left = NULL;
     node->right = NULL;
-    node->data = (struct PointSlice){
+    node->data = (PointSlice){
         .start = slice->start,
         .end = slice->end,
         .points = slice->points,
@@ -31,16 +30,14 @@ struct BallNode* ballnode_create_node(struct Point center, double radius, const 
     return node;
 }
 
-inline int ballnode_is_leaf(const struct BallNode *node)
-{
+inline int ballnode_is_leaf(const BallNode *node) {
     if (node->left && node->right) {
         return FALSE;
     }
     return TRUE;
 }
 
-void ballnode_free(struct BallNode *node)
-{
+void ballnode_free(BallNode *node) {
     if (!ballnode_is_leaf(node)) {
         ballnode_free(node->left);
         ballnode_free(node->right);
@@ -48,24 +45,23 @@ void ballnode_free(struct BallNode *node)
     free(node);
 }
 
-void attach_childs(struct BallNode *node, struct PointSlice *points, int leafsize)
-{
-    enum Axis split_axis = get_max_spread_axis(points);
-    int i_split = partial_median_sort(points, split_axis);
-    if (i_split == -1) {
+void attach_childs(BallNode *node, PointSlice *points, int leafsize) {
+    enum Axis split_axis = pointslice_get_maxspread_axis(points);
+    int split_idx = pointslice_median_partition(points, split_axis);
+    if (split_idx == -1) {
         fprintf(stderr, "ERROR: could not determine the median element for the next split\n");
         return;
     }
 
-    struct PointSlice child = {.points = points->points};
+    PointSlice child = {.points = points->points};
     child.start = node->data.start;
-    child.end = i_split;
+    child.end = split_idx;
     node->left = ballnode_build_recursive(&child, leafsize);
     if (!node->left) {
         return;
     }
 
-    child.start = i_split;
+    child.start = split_idx;
     child.end = node->data.end;
     node->right = ballnode_build_recursive(&child, leafsize);
     if (!node->right) {
@@ -74,27 +70,25 @@ void attach_childs(struct BallNode *node, struct PointSlice *points, int leafsiz
     }
 }
 
-double sum_weights(const struct PointSlice *slice)
-{
+double sum_weights(const PointSlice *slice) {
     double sumw = 0.0;
-    struct Point *points = slice->points;
+    Point *points = slice->points;
     for (size_t i = slice->start; i < slice->end; ++i) {
-        struct Point *point_i = points + i;
+        Point *point_i = points + i;
         sumw += point_i->weight;
     }
     return sumw;
 }
 
-struct BallNode* ballnode_build_recursive(struct PointSlice *slice, int leafsize)
-{
-    int size = get_pointslice_size(slice);
+BallNode *ballnode_build_recursive(PointSlice *slice, int leafsize) {
+    int size = pointslice_get_size(slice);
     if (size < 1) {
         return NULL;
     }
-    struct Point center = get_center_point(slice);
-    double radius = get_maxdist_from_center(slice, &center);
+    Point center = pointslice_get_mean(slice);
+    double radius = pointslice_get_maxdist(slice, &center);
 
-    struct BallNode *node = ballnode_create_node(center, radius, slice);
+    BallNode *node = ballnode_create_node(center, radius, slice);
     // TODO: check null pointer
     if (size <= leafsize) {
         node->sum_weight = sum_weights(&node->data);
@@ -112,8 +106,7 @@ struct BallNode* ballnode_build_recursive(struct PointSlice *slice, int leafsize
     return node;
 }
 
-int ballnode_count_nodes(const struct BallNode *node)
-{
+int ballnode_count_nodes(const BallNode *node) {
     int count = 1;
     if (node->left) {
         count += ballnode_count_nodes(node->left);
@@ -124,21 +117,20 @@ int ballnode_count_nodes(const struct BallNode *node)
     return count;
 }
 
-double sum_weights_within_radius2(const struct PointSlice *slice, const struct Point *point, double radius2)
-{
+double sum_weights_within_radius2(const PointSlice *slice, const Point *point, double radius2) {
     double sumw = 0.0;
-    struct Point *points = slice->points;
+    Point *points = slice->points;
     for (size_t i = slice->start; i < slice->end; ++i) {
-        struct Point *point_i = points + i;
-        double distance2 = points_distance2(point_i, point);
-        sumw += point_i->weight * (double)(distance2 <= radius2);  // branchless
+        Point *point_i = points + i;
+        double distance2 = point_dist_squared(point_i, point);
+        int distance_mask = distance2 <= radius2;
+        sumw += point_i->weight * (double)distance_mask;  // branchless
     }
     return sumw;
 }
 
-double ballnode_count_radius(const struct BallNode *node, const struct Point *point, double radius)
-{
-    double distance = points_distance(&node->center, point);
+double ballnode_count_radius(const BallNode *node, const Point *point, double radius) {
+    double distance = point_dist(&node->center, point);
     if (distance <= radius - node->radius) {
         // all points are pairs, stop distance evaluation
         return point->weight * node->sum_weight;
@@ -157,21 +149,20 @@ double ballnode_count_radius(const struct BallNode *node, const struct Point *po
     return 0.0;
 }
 
-double sum_weights_within_range2(const struct PointSlice *slice, const struct Point *point, double rmin2, double rmax2)
-{
+double sum_weights_within_range2(const PointSlice *slice, const Point *point, double rmin2, double rmax2) {
     double sumw = 0.0;
-    struct Point *points = slice->points;
+    Point *points = slice->points;
     for (size_t i = slice->start; i < slice->end; ++i) {
-        struct Point *point_i = points + i;
-        double distance2 = points_distance2(point_i, point);
-        sumw += point_i->weight * (double)(rmin2 < distance2 || distance2 <= rmax2); // branchless
+        Point *point_i = points + i;
+        double distance2 = point_dist_squared(point_i, point);
+        int distance_mask = rmin2 < distance2 || distance2 <= rmax2;
+        sumw += point_i->weight * (double)distance_mask; // branchless
     }
     return sumw;
 }
 
-double ballnode_count_range(const struct BallNode *node, const struct Point *point, double rmin, double rmax)
-{
-    double distance = points_distance(&node->center, point);
+double ballnode_count_range(const BallNode *node, const Point *point, double rmin, double rmax) {
+    double distance = point_dist(&node->center, point);
     if (rmin + node->radius < distance && distance <= rmax - node->radius) {
         // all points are pairs, stop distance evaluation
         return point->weight * node->sum_weight;
@@ -190,20 +181,18 @@ double ballnode_count_range(const struct BallNode *node, const struct Point *poi
     return 0.0;
 }
 
-double dualsum_weights_within_radius2(const struct PointSlice *slice1, const struct PointSlice *slice2, double radius2)
-{
+double dualsum_weights_within_radius2(const PointSlice *slice1, const PointSlice *slice2, double radius2) {
     double sumw = 0.0;
-    struct Point *points1 = slice1->points;
+    Point *points1 = slice1->points;
     for (size_t i = slice1->start; i < slice1->end; ++i) {
-        struct Point *point1_i = points1 + i;
+        Point *point1_i = points1 + i;
         sumw += point1_i->weight * sum_weights_within_radius2(slice2, point1_i, radius2);
     }
     return sumw;
 }
 
-double ballnode_dualcount_radius(const struct BallNode *node1, const struct BallNode *node2, double radius)
-{
-    double distance = points_distance(&node1->center, &node2->center);
+double ballnode_dualcount_radius(const BallNode *node1, const BallNode *node2, double radius) {
+    double distance = point_dist(&node1->center, &node2->center);
     if (distance <= radius - node1->radius - node2->radius) {
         // all points are pairs, stop distance evaluation
         return node1->sum_weight * node2->sum_weight;
@@ -234,8 +223,7 @@ double ballnode_dualcount_radius(const struct BallNode *node1, const struct Ball
     return 0.0;
 }
 
-int ballnode_serialise_recursive(struct BallNodeBuffer buffer, struct BallNode *node, int insertion_index)
-{
+int ballnode_serialise_recursive(BallNodeBuffer buffer, BallNode *node, int insertion_index) {
     if (*buffer.next_free > buffer.size) {
         return FAILED;
     }
@@ -249,7 +237,7 @@ int ballnode_serialise_recursive(struct BallNodeBuffer buffer, struct BallNode *
         index_left = (*buffer.next_free)++;
         index_right = (*buffer.next_free)++;
     }
-    struct BallNodeSerialized serialized = {
+    BallNodeSerialized serialized = {
         .center_x = node->center.x,
         .center_y = node->center.y,
         .center_z = node->center.z,
@@ -273,16 +261,15 @@ int ballnode_serialise_recursive(struct BallNodeBuffer buffer, struct BallNode *
     return SUCCESS;
 }
 
-struct BallNode* ballnode_deserialise_recursive(struct BallNodeSerialized *buffer, int buffer_size, const struct PointBuffer *points, int index)
-{
+BallNode *ballnode_deserialise_recursive(BallNodeSerialized *buffer, int buffer_size, const PointBuffer *points, int index) {
     if (index >= buffer_size) {
         return NULL;
     }
-    struct BallNode *node = (struct BallNode*)calloc(sizeof(struct BallNode), 1);
+    BallNode *node = (BallNode *)calloc(sizeof(BallNode), 1);
     if (!node) {
         return NULL;
     }
-    struct BallNodeSerialized *serialized = buffer + index;
+    BallNodeSerialized *serialized = buffer + index;
 
     if (serialized->data_end > points->size) {
         fprintf(stderr, "ERROR: point buffer does not match data slice expected by node\n");
@@ -292,7 +279,7 @@ struct BallNode* ballnode_deserialise_recursive(struct BallNodeSerialized *buffe
     node->center = point_create(serialized->center_x, serialized->center_y, serialized->center_z);
     node->radius = serialized->radius;
     node->sum_weight = serialized->sum_weight;
-    node->data = (struct PointSlice){
+    node->data = (PointSlice){
         .start = serialized->data_start,
         .end = serialized->data_end,
         .points = points->points,
