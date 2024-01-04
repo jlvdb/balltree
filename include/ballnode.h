@@ -4,34 +4,36 @@
 #include "point.h"
 
 struct BallNode {
-    struct Point center;
+    Point center;
     double radius;
-    double sum_weight;
     struct BallNode *left;
     struct BallNode *right;
-    struct PointSlice data;
+    PointSlice data;
+    double sum_weight;
 };
+typedef struct BallNode BallNode;
 
-struct BallNodeSerialized {
+
+typedef struct {
     double center_x, center_y, center_z;
     double radius;
     double sum_weight;
-    int left, right;  // struct BallNode*
-    int data_start, data_end;  // struct PointSlice
-};
+    int left, right;  // BallNode* -> index in BallNodeBuffer
+    int data_start, data_end;  // PointSlice
+} BallNodeSerialized;
 
-struct BallNodeBuffer {
+typedef struct {
     int size;
+    BallNodeSerialized *buffer;
     int *next_free;
-    struct BallNodeSerialized *buffer;
-};
+} BallNodeBuffer;
 
-struct BallNode* ballnode_build_recursive(struct PointSlice*, int);
-int ballnode_count_nodes(const struct BallNode*);
-double ballnode_count_radius(const struct BallNode*, const struct Point*, double);
-double ballnode_count_range(const struct BallNode*, const struct Point*, double, double);
-double ballnode_dualcount_radius(const struct BallNode*, const struct BallNode*, double);
-int ballnode_serialise_recursive(struct BallNodeBuffer, struct BallNode*, int);
-struct BallNode* ballnode_deserialise_recursive(struct BallNodeSerialized*, int, const struct PointBuffer*, int);
+BallNode *ballnode_build_recursive(PointSlice *, int);
+int ballnode_count_nodes(const BallNode *);
+double ballnode_count_radius(const BallNode *, const Point *, double);
+double ballnode_count_range(const BallNode *, const Point *, double, double);
+double ballnode_dualcount_radius(const BallNode *, const BallNode *, double);
+int ballnode_serialise_recursive(BallNodeBuffer, BallNode *, int);
+BallNode *ballnode_deserialise_recursive(BallNodeSerialized *, int, const PointBuffer *, int);
 
 #endif /* BALLNODE_H */

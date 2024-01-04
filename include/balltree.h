@@ -4,21 +4,21 @@
 #include "point.h"
 #include "ballnode.h"
 
-struct BallTree {
-    struct BallNode *root;
-    struct PointBuffer data;
+typedef struct {
+    BallNode *root;
+    PointBuffer data;
     int leafsize;
-};
+} BallTree;
 
-struct BallTree* balltree_build(const struct PointBuffer*);
-struct BallTree* balltree_build_leafsize(const struct PointBuffer*, int);
-void balltree_free(struct BallTree*);
-int balltree_count_nodes(const struct BallTree*);
-int balltree_to_file(const struct BallTree*, const char*);
-struct BallTree* balltree_from_file(const char*);
+BallTree *balltree_build(const PointBuffer *);
+BallTree *balltree_build_leafsize(const PointBuffer *, int);
+void balltree_free(BallTree *);
+int balltree_count_nodes(const BallTree *);
+int balltree_to_file(const BallTree *, const char *);
+BallTree *balltree_from_file(const char *);
 
-double balltree_count_radius(const struct BallTree*, const struct Point*, double);
-double balltree_count_range(const struct BallTree*, const struct Point*, double, double);
-double balltree_dualcount_radius(const struct BallTree*, const struct BallTree*, double);
+double balltree_count_radius(const BallTree *, const Point *, double);
+double balltree_count_range(const BallTree *, const Point *, double, double);
+double balltree_dualcount_radius(const BallTree *, const BallTree *, double);
 
 #endif /* BALLTREE_H */
