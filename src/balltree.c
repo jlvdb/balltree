@@ -1,9 +1,9 @@
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "point.h"
 #include "ballnode.h"
 #include "balltree.h"
-
-#define SUCCESS 1
-#define FAILED  0
 
 #define DEFAULT_LEAFSIZE 20
 
@@ -32,7 +32,7 @@ BallTree* balltree_build_leafsize(const PointBuffer *buffer, int leafsize) {
     }
     tree->data = *data;
 
-    BallNode *root = bnode_build_recursive(data, 0, size, leafsize);
+    BallNode *root = bnode_build(data, 0, size, leafsize);
     if (root == NULL) {
         balltree_free(tree);
         return NULL;

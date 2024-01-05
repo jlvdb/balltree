@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
     // read the input file contents, show the elapsed time
     time = clock();
     buffer = load_data_from_file();
-    if (!buffer) {
+    if (buffer == NULL) {
         return 1;
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
@@ -33,13 +33,14 @@ int main(int argc, char** argv) {
     // build the ball tree, show the elapsed time
     time = clock();
     tree = balltree_build_leafsize(buffer, leafsize);
-    if (!tree) {
+    if (tree == NULL) {
         ptbuf_free(buffer);
         return 1;
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
     printf("built tree in %.3lf sec\n", elapsed);
     printf("radius=%.3lf\n", query_radius);
+    ptbuf_free(buffer);
 
     // query point at fixed radius, show the elapsed time
     int imax = 1;
@@ -67,10 +68,9 @@ int main(int argc, char** argv) {
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
     printf("self found %9.0lf pairs in %7.3lf sec\n", count, elapsed);
 
-    /*
     // dump and restore
     time = clock();
-    if (!balltree_to_file(tree, "testing/tree.dump")) {
+    if (balltree_to_file(tree, "testing/tree.dump") != 0) {
         ptbuf_free(buffer);
         balltree_free(tree);
         return 1;
@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
     printf("dumped   in %7.3lf ms\n", elapsed);
     time = clock();
     BallTree *tree2 = balltree_from_file("testing/tree.dump");
-    if (!tree2) {
+    if (tree2 == NULL) {
         ptbuf_free(buffer);
         balltree_free(tree); 
         return 1;  
@@ -87,17 +87,17 @@ int main(int argc, char** argv) {
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
     printf("restored in %7.3lf ms\n", elapsed);
 
-    balltree_free(tree2);
-    */
     balltree_free(tree);
-    ptbuf_free(buffer);
+    count = balltree_dualcount_radius(tree2, tree2, query_radius);
+    printf("self found %9.0lf pairs\n", count);
+
+    balltree_free(tree2);
     return 0;
 }
 
-
 PointBuffer *load_data_from_file() {
     PointBuffer *buffer = ptbuf_new(256);
-    if (!buffer) {
+    if (buffer == NULL) {
         fprintf(stderr, "ERROR: memory allocation failed\n");
         ptbuf_free(buffer);
         return NULL;
@@ -132,10 +132,6 @@ PointBuffer *load_data_from_file() {
         ptbuf_free(buffer);
         return NULL;
     }
-    if (ptbuf_resize(buffer, n_records) != 0) {
-        fprintf(stderr, "ERROR: memory reallocation failed\n");
-        ptbuf_free(buffer);
-        return NULL;
-    }
+    ptbuf_resize(buffer, n_records);
     return buffer;
 }
