@@ -15,7 +15,7 @@ enum Axis {X, Y, Z};
 
 Point point_create_weighted(double, double, double, double);
 Point point_create(double, double, double);
-double point_dist_squared(const Point *, const Point *);
+double point_dist_sq(const Point *, const Point *);
 double point_dist(const Point *, const Point *);
 
 typedef struct {
@@ -23,9 +23,10 @@ typedef struct {
     Point *points;
 } PointBuffer;
 
-PointBuffer *pointbuffer_new(int);
-void pointbuffer_free(PointBuffer *);
-int pointbuffer_resize(PointBuffer *, int);
+PointBuffer *ptbuf_new(int);
+void ptbuf_free(PointBuffer *);
+int ptbuf_resize(PointBuffer *, int);
+PointBuffer *ptbuf_copy(const PointBuffer *);
 
 typedef struct {
     int start;
@@ -33,14 +34,7 @@ typedef struct {
     Point *points;
 } PointSlice;
 
-PointSlice *pointslice_from_buffer(const PointBuffer *);
-int pointslice_get_size(const PointSlice *);
-int pointslice_update_start(PointSlice *, int);
-int pointslice_update_end(PointSlice *, int);
-
-Point pointslice_get_mean(const PointSlice *);
-double pointslice_get_maxdist(const PointSlice *, Point *);
-enum Axis pointslice_get_maxspread_axis(const PointSlice *);
-int pointslice_median_partition(PointSlice *, enum Axis);
+PointSlice *ptslc_from_buffer(const PointBuffer *);
+int ptslc_get_size(const PointSlice *);
 
 #endif /* POINT_H */

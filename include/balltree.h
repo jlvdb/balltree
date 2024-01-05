@@ -20,5 +20,6 @@ BallTree *balltree_from_file(const char *);
 double balltree_count_radius(const BallTree *, const Point *, double);
 double balltree_count_range(const BallTree *, const Point *, double, double);
 double balltree_dualcount_radius(const BallTree *, const BallTree *, double);
+double balltree_dualcount_range(const BallTree *, const BallTree *, double, double);
 
 #endif /* BALLTREE_H */
