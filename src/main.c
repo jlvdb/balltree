@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
     time = clock();
     tree = balltree_build_leafsize(buffer, leafsize);
     if (!tree) {
-        pointbuffer_free(buffer);
+        ptbuf_free(buffer);
         return 1;
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
@@ -67,10 +67,11 @@ int main(int argc, char** argv) {
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
     printf("self found %9.0lf pairs in %7.3lf sec\n", count, elapsed);
 
+    /*
     // dump and restore
     time = clock();
     if (!balltree_to_file(tree, "testing/tree.dump")) {
-        pointbuffer_free(buffer);
+        ptbuf_free(buffer);
         balltree_free(tree);
         return 1;
     }
@@ -79,25 +80,26 @@ int main(int argc, char** argv) {
     time = clock();
     BallTree *tree2 = balltree_from_file("testing/tree.dump");
     if (!tree2) {
-        pointbuffer_free(buffer);
+        ptbuf_free(buffer);
         balltree_free(tree); 
         return 1;  
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
     printf("restored in %7.3lf ms\n", elapsed);
 
-    pointbuffer_free(buffer);
     balltree_free(tree2);
+    */
     balltree_free(tree);
+    ptbuf_free(buffer);
     return 0;
 }
 
 
 PointBuffer *load_data_from_file() {
-    PointBuffer *buffer = pointbuffer_new(256);
+    PointBuffer *buffer = ptbuf_new(256);
     if (!buffer) {
         fprintf(stderr, "ERROR: memory allocation failed\n");
-        pointbuffer_free(buffer);
+        ptbuf_free(buffer);
         return NULL;
     }
 
@@ -105,7 +107,7 @@ PointBuffer *load_data_from_file() {
     FILE *file = fopen(filepath, "r");
     if (file == NULL) {
         fprintf(stderr, "ERROR: failed to open file: %s\n", filepath);
-        pointbuffer_free(buffer);
+        ptbuf_free(buffer);
         return NULL;
     }
 
@@ -113,9 +115,9 @@ PointBuffer *load_data_from_file() {
     Point point = {0.0, 0.0, 0.0, 0.5};
     while (fscanf(file, "%lf %lf %lf", &point.x, &point.y, &point.z) == 3) {
         if (n_records == buffer->size) {
-            if (pointbuffer_resize(buffer, buffer->size * 2) != 0) {
+            if (ptbuf_resize(buffer, buffer->size * 2) != 0) {
                 fprintf(stderr, "ERROR: failed to expand buffer\n");
-                pointbuffer_free(buffer);
+                ptbuf_free(buffer);
                 fclose(file);
                 return NULL;
             }
@@ -127,12 +129,12 @@ PointBuffer *load_data_from_file() {
 
     if (n_records == 0) {
         fprintf(stderr, "ERROR: could not read any records from file\n");
-        pointbuffer_free(buffer);
+        ptbuf_free(buffer);
         return NULL;
     }
-    if (pointbuffer_resize(buffer, n_records) != 0) {
+    if (ptbuf_resize(buffer, n_records) != 0) {
         fprintf(stderr, "ERROR: memory reallocation failed\n");
-        pointbuffer_free(buffer);
+        ptbuf_free(buffer);
         return NULL;
     }
     return buffer;
