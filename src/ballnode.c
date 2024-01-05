@@ -1,22 +1,23 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "point.h"
 #include "ballnode.h"
 
+#define TRUE  1
+#define FALSE 0
+
 static inline void point_swap(Point *p1, Point *p2);
 static inline double point_get_coord(const Point *point, enum Axis axis);
-
 static double ptslc_sum_weights(const PointSlice *);
 static Point ptslc_get_mean(const PointSlice *);
 static double ptslc_get_maxdist(const PointSlice *, Point *);
 static enum Axis ptslc_get_maxspread_axis(const PointSlice *);
-
 static int ptslc_partition(PointSlice *slice, int pivot_idx, enum Axis axis);
 static int ptslc_quickselect(PointSlice *slice, int partition_idx, enum Axis axis);
 static int ptslc_partition_maxspread_axis(PointSlice *slice);
+static BallNode *bnode_init(PointBuffer *buffer, int start, int end);
 
 
 static inline void point_swap(Point *p1, Point *p2) {
@@ -170,7 +171,7 @@ static int ptslc_partition_maxspread_axis(PointSlice *slice) {
     return ptslc_quickselect(slice, median_idx, split_axis);
 }
 
-BallNode *bnode_init(PointBuffer *buffer, int start, int end) {
+static BallNode *bnode_init(PointBuffer *buffer, int start, int end) {
     BallNode *node = (BallNode *)calloc(1, sizeof(BallNode));
     if (node == NULL) {
         fprintf(stderr, "ERROR: BallTree node allocation failed\n");
@@ -187,7 +188,7 @@ BallNode *bnode_init(PointBuffer *buffer, int start, int end) {
     return node;
 }
 
-BallNode *bnode_build_recursive(PointBuffer *buffer, int start, int end, int leafsize) {
+BallNode *bnode_build(PointBuffer *buffer, int start, int end, int leafsize) {
     BallNode *node = bnode_init(buffer, start, end);
     if (node == NULL) {
         return NULL;
@@ -209,14 +210,14 @@ BallNode *bnode_build_recursive(PointBuffer *buffer, int start, int end, int lea
         }
 
         // create left child from the set points of with lower split-axis values
-        node->left = bnode_build_recursive(buffer, start, split_idx, leafsize);
+        node->left = bnode_build(buffer, start, split_idx, leafsize);
         if (node->left == NULL) {
             bnode_free(node);
             return NULL;
         }
 
         // create right child from the set of points with larger split-axis values
-        node->right = bnode_build_recursive(buffer, split_idx, end, leafsize);
+        node->right = bnode_build(buffer, split_idx, end, leafsize);
         if (node->right == NULL) {
             bnode_free(node);
             return NULL;
@@ -236,4 +237,8 @@ void bnode_free(BallNode *node) {
         bnode_free(node->right);
     }
     free(node);
+}
+
+int bnode_is_leaf(const BallNode *node) {
+    return (node->left == NULL && node->right == NULL) ? TRUE : FALSE;
 }

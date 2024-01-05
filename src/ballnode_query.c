@@ -1,33 +1,38 @@
+#include <math.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "point.h"
 #include "ballnode.h"
 
-#define SUCCESS 1
-#define FAILED  0
-
 #define TRUE  1
 #define FALSE 0
 
-int bnode_is_leaf(const BallNode *node);
-double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *point, double rad_sq);
-double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *point, double rmin_sq, double rmax_sq);
-double ptslc_dualsumw_in_radius_sq(const PointSlice *slice1, const PointSlice *slice2, double rad_sq);
-double ptslc_dualsumw_in_range_sq(const PointSlice *slice1, const PointSlice *slice2, double rmin_sq, double rmax_sq);
+static double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *point, double rad_sq);
+static double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *point, double rmin_sq, double rmax_sq);
+static double ptslc_dualsumw_in_radius_sq(const PointSlice *slice1, const PointSlice *slice2, double rad_sq);
+static double ptslc_dualsumw_in_range_sq(const PointSlice *slice1, const PointSlice *slice2, double rmin_sq, double rmax_sq);
+// the functions below are defined elsewhere but redefined as inline for performance
+static inline double _point_dist_sq(const Point *p1, const Point *p2);
+static inline int _bnode_is_leaf(const BallNode *node);
 
 
-int bnode_is_leaf(const BallNode *node) {
+static inline double _point_dist_sq(const Point *p1, const Point *p2) {
+    double dx = p1->x - p2->x;
+    double dy = p1->y - p2->y;
+    double dz = p1->z - p2->z;
+    return dx*dx + dy*dy + dz*dz;
+}
+
+static inline int _bnode_is_leaf(const BallNode *node) {
     return (node->left == NULL && node->right == NULL) ? TRUE : FALSE;
 }
 
-double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *point, double rad_sq) {
+static double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *point, double rad_sq) {
     double sumw = 0.0;
     Point *points = slice->points;
     for (size_t i = slice->start; i < slice->end; ++i) {
         Point *point_i = points + i;
-        double dist_sq = point_dist_sq(point_i, point);
+        double dist_sq = _point_dist_sq(point_i, point);
         // add point weight if condition is met otherwise zero
         int dist_mask = dist_sq <= rad_sq;
         sumw += point_i->weight * (double)dist_mask;
@@ -35,12 +40,12 @@ double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *point, doub
     return sumw;
 }
 
-double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *point, double rmin_sq, double rmax_sq) {
+static double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *point, double rmin_sq, double rmax_sq) {
     double sumw = 0.0;
     Point *points = slice->points;
     for (size_t i = slice->start; i < slice->end; ++i) {
         Point *point_i = points + i;
-        double dist_sq = point_dist_sq(point_i, point);
+        double dist_sq = _point_dist_sq(point_i, point);
         // add point weight if condition is met otherwise zero
         int dist_mask = rmin_sq < dist_sq || dist_sq <= rmax_sq;
         sumw += point_i->weight * (double)dist_mask;
@@ -48,7 +53,7 @@ double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *point, doubl
     return sumw;
 }
 
-double ptslc_dualsumw_in_radius_sq(const PointSlice *slice1, const PointSlice *slice2, double rad_sq) {
+static double ptslc_dualsumw_in_radius_sq(const PointSlice *slice1, const PointSlice *slice2, double rad_sq) {
     double sumw = 0.0;
     Point *points1 = slice1->points;
     for (size_t i = slice1->start; i < slice1->end; ++i) {
@@ -58,7 +63,7 @@ double ptslc_dualsumw_in_radius_sq(const PointSlice *slice1, const PointSlice *s
     return sumw;
 }
 
-double ptslc_dualsumw_in_range_sq(const PointSlice *slice1, const PointSlice *slice2, double rmin_sq, double rmax_sq) {
+static double ptslc_dualsumw_in_range_sq(const PointSlice *slice1, const PointSlice *slice2, double rmin_sq, double rmax_sq) {
     double sumw = 0.0;
     Point *points1 = slice1->points;
     for (size_t i = slice1->start; i < slice1->end; ++i) {
@@ -80,7 +85,7 @@ int bnode_count_nodes(const BallNode *node) {
 }
 
 double bnode_count_radius(const BallNode *node, const Point *point, double radius) {
-    double distance = point_dist(&node->center, point);
+    double distance = sqrt(_point_dist_sq(&node->center, point));
 
     // case: all points must be pairs
     if (distance <= radius - node->radius) {
@@ -89,7 +94,7 @@ double bnode_count_radius(const BallNode *node, const Point *point, double radiu
     
     // case: some points may be pairs
     else if (distance <= radius + node->radius) {
-        if (bnode_is_leaf(node) == FALSE) {
+        if (_bnode_is_leaf(node) == FALSE) {
             return bnode_count_radius(node->left, point, radius) +
                    bnode_count_radius(node->right, point, radius);
         }
@@ -101,7 +106,7 @@ double bnode_count_radius(const BallNode *node, const Point *point, double radiu
 }
 
 double bnode_count_range(const BallNode *node, const Point *point, double rmin, double rmax) {
-    double distance = point_dist(&node->center, point);
+    double distance = sqrt(_point_dist_sq(&node->center, point));
 
     // case: all points must be pairs
     if (rmin + node->radius < distance && distance <= rmax - node->radius) {
@@ -110,7 +115,7 @@ double bnode_count_range(const BallNode *node, const Point *point, double rmin, 
 
     // case: some points may be pairs
     else if (rmin - node->radius < distance || distance <= rmax + node->radius) {
-        if (bnode_is_leaf(node) == FALSE) {
+        if (_bnode_is_leaf(node) == FALSE) {
             return bnode_count_range(node->left, point, rmin, rmax) +
                    bnode_count_range(node->right, point, rmin, rmax);
         }
@@ -123,7 +128,7 @@ double bnode_count_range(const BallNode *node, const Point *point, double rmin, 
 }
 
 double bnode_dualcount_radius(const BallNode *node1, const BallNode *node2, double radius) {
-    double distance = point_dist(&node1->center, &node2->center);
+    double distance = sqrt(_point_dist_sq(&node1->center, &node2->center));
     double sum_node_radii = node1->radius + node2->radius;
 
     // case: all points must be pairs
@@ -133,8 +138,8 @@ double bnode_dualcount_radius(const BallNode *node1, const BallNode *node2, doub
 
     // case: some points may be pairs
     else if (distance <= radius + sum_node_radii) {
-        int node1_is_leaf = bnode_is_leaf(node1);
-        int node2_is_leaf = bnode_is_leaf(node2);
+        int node1_is_leaf = _bnode_is_leaf(node1);
+        int node2_is_leaf = _bnode_is_leaf(node2);
 
         // case: both nodes can be traversed further
         if (node1_is_leaf == FALSE && node2_is_leaf == FALSE) {
@@ -164,7 +169,7 @@ double bnode_dualcount_radius(const BallNode *node1, const BallNode *node2, doub
 }
 
 double bnode_dualcount_range(const BallNode *node1, const BallNode *node2, double rmin, double rmax) {
-    double distance = point_dist(&node1->center, &node2->center);
+    double distance = sqrt(_point_dist_sq(&node1->center, &node2->center));
     double sum_node_radii = node1->radius + node2->radius;
 
     // case: all points must be pairs
@@ -174,8 +179,8 @@ double bnode_dualcount_range(const BallNode *node1, const BallNode *node2, doubl
 
     // case: some points may be pairs
     else if (rmin - sum_node_radii < distance || distance <= rmax + sum_node_radii) {
-        int node1_is_leaf = bnode_is_leaf(node1);
-        int node2_is_leaf = bnode_is_leaf(node2);
+        int node1_is_leaf = _bnode_is_leaf(node1);
+        int node2_is_leaf = _bnode_is_leaf(node2);
 
         // case: both nodes can be traversed further
         if (node1_is_leaf == FALSE && node2_is_leaf == FALSE) {
