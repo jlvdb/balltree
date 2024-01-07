@@ -40,7 +40,6 @@ int main(int argc, char** argv) {
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
     printf("built tree in %.3lf sec\n", elapsed);
     printf("radius=%.3lf\n", query_radius);
-    ptbuf_free(buffer);
 
     // query point at fixed radius, show the elapsed time
     int imax = 1;
@@ -61,6 +60,7 @@ int main(int argc, char** argv) {
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
     printf(" all found %9.0lf pairs in %7.3lf sec\n", count, elapsed);
+    ptbuf_free(buffer);  // no longer needed
 
     // query with itself, show the elapsed time
     time = clock();

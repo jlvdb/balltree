@@ -32,6 +32,41 @@ PointBuffer *ptbuf_new(int size) {
     return buffer;
 }
 
+PointBuffer *ptbuf_from_buffers(
+    int size,
+    double *x_vals,
+    double *y_vals,
+    double *z_vals
+) {
+    PointBuffer *buffer = ptbuf_new(size);
+    if (buffer == NULL) {
+        return NULL;
+    }
+    Point *points = buffer->points;
+    for (int i = 0; i < size; ++i) {
+        points[i] = point_create(x_vals[i], y_vals[i], z_vals[i]);
+    }
+    return buffer;
+}
+
+PointBuffer *ptbuf_from_buffers_weighted(
+    int size,
+    double *x_vals,
+    double *y_vals,
+    double *z_vals,
+    double *weights
+) {
+    PointBuffer *buffer = ptbuf_from_buffers(size, x_vals, y_vals, z_vals);
+    if (buffer == NULL) {
+        return NULL;
+    }
+    Point *points = buffer->points;
+    for (int i = 0; i < size; ++i) {
+        points[i].weight = weights[i];
+    }
+    return buffer;
+}
+
 void ptbuf_free(PointBuffer *buffer) {
     if (buffer->points != NULL) {
         free(buffer->points);
