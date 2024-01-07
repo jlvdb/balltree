@@ -27,7 +27,11 @@ static inline int _bnode_is_leaf(const BallNode *node) {
     return (node->left == NULL && node->right == NULL) ? TRUE : FALSE;
 }
 
-static double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *point, double rad_sq) {
+static double ptslc_sumw_in_radius_sq(
+    const PointSlice *slice,
+    const Point *point,
+    double rad_sq
+) {
     double sumw = 0.0;
     Point *points = slice->points;
     for (int i = slice->start; i < slice->end; ++i) {
@@ -40,7 +44,12 @@ static double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *poin
     return sumw;
 }
 
-static double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *point, double rmin_sq, double rmax_sq) {
+static double ptslc_sumw_in_range_sq(
+    const PointSlice *slice,
+    const Point *point,
+    double rmin_sq,
+    double rmax_sq
+) {
     double sumw = 0.0;
     Point *points = slice->points;
     for (int i = slice->start; i < slice->end; ++i) {
@@ -53,22 +62,31 @@ static double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *point
     return sumw;
 }
 
-static double ptslc_dualsumw_in_radius_sq(const PointSlice *slice1, const PointSlice *slice2, double rad_sq) {
+static double ptslc_dualsumw_in_radius_sq(
+    const PointSlice *slice1,
+    const PointSlice *slice2,
+    double rad_sq
+) {
     double sumw = 0.0;
     Point *points1 = slice1->points;
     for (int i = slice1->start; i < slice1->end; ++i) {
-        Point *point1_i = points1 + i;
-        sumw += point1_i->weight * ptslc_sumw_in_radius_sq(slice2, point1_i, rad_sq);
+        Point *pt1 = points1 + i;
+        sumw += pt1->weight * ptslc_sumw_in_radius_sq(slice2, pt1, rad_sq);
     }
     return sumw;
 }
 
-static double ptslc_dualsumw_in_range_sq(const PointSlice *slice1, const PointSlice *slice2, double rmin_sq, double rmax_sq) {
+static double ptslc_dualsumw_in_range_sq(
+    const PointSlice *slice1,
+    const PointSlice *slice2, 
+    double rmin_sq,
+    double rmax_sq
+) {
     double sumw = 0.0;
     Point *points1 = slice1->points;
     for (int i = slice1->start; i < slice1->end; ++i) {
-        Point *point1_i = points1 + i;
-        sumw += point1_i->weight * ptslc_sumw_in_range_sq(slice2, point1_i, rmin_sq, rmax_sq);
+        Point *pt1 = points1 + i;
+        sumw += pt1->weight * ptslc_sumw_in_range_sq(slice2, pt1, rmin_sq, rmax_sq);
     }
     return sumw;
 }
@@ -84,7 +102,11 @@ int bnode_count_nodes(const BallNode *node) {
     return count;
 }
 
-double bnode_count_radius(const BallNode *node, const Point *point, double radius) {
+double bnode_count_radius(
+    const BallNode *node,
+    const Point *point,
+    double radius
+) {
     double distance = sqrt(_point_dist_sq(&node->center, point));
 
     // case: all points must be pairs
@@ -99,13 +121,22 @@ double bnode_count_radius(const BallNode *node, const Point *point, double radiu
                    bnode_count_radius(node->right, point, radius);
         }
         // O(n): check each pair individually
-        return point->weight * ptslc_sumw_in_radius_sq(&node->data, point, radius * radius);
+        return point->weight * ptslc_sumw_in_radius_sq(
+            &node->data,
+            point,
+            radius * radius
+        );
     }
 
     return 0.0;
 }
 
-double bnode_count_range(const BallNode *node, const Point *point, double rmin, double rmax) {
+double bnode_count_range(
+    const BallNode *node,
+    const Point *point,
+    double rmin,
+    double rmax
+) {
     double distance = sqrt(_point_dist_sq(&node->center, point));
 
     // case: all points must be pairs
@@ -120,14 +151,22 @@ double bnode_count_range(const BallNode *node, const Point *point, double rmin, 
                    bnode_count_range(node->right, point, rmin, rmax);
         }
         // O(n): check each pair individually
-        return point->weight * ptslc_sumw_in_range_sq(&node->data, point, rmin * rmin, rmax * rmax);
-
+        return point->weight * ptslc_sumw_in_range_sq(
+            &node->data,
+            point,
+            rmin * rmin,
+            rmax * rmax
+        );
     }
 
     return 0.0;
 }
 
-double bnode_dualcount_radius(const BallNode *node1, const BallNode *node2, double radius) {
+double bnode_dualcount_radius(
+    const BallNode *node1,
+    const BallNode *node2,
+    double radius
+) {
     double distance = sqrt(_point_dist_sq(&node1->center, &node2->center));
     double sum_node_radii = node1->radius + node2->radius;
 
@@ -162,13 +201,22 @@ double bnode_dualcount_radius(const BallNode *node1, const BallNode *node2, doub
         }
 
         // O(n^2): check pairs formed between points of both nodes individually
-        return ptslc_dualsumw_in_radius_sq(&node1->data, &node2->data, radius * radius);
+        return ptslc_dualsumw_in_radius_sq(
+            &node1->data,
+            &node2->data,
+            radius * radius
+        );
     }
 
     return 0.0;
 }
 
-double bnode_dualcount_range(const BallNode *node1, const BallNode *node2, double rmin, double rmax) {
+double bnode_dualcount_range(
+    const BallNode *node1,
+    const BallNode *node2,
+    double rmin,
+    double rmax
+) {
     double distance = sqrt(_point_dist_sq(&node1->center, &node2->center));
     double sum_node_radii = node1->radius + node2->radius;
 
@@ -203,7 +251,12 @@ double bnode_dualcount_range(const BallNode *node1, const BallNode *node2, doubl
         }
 
         // O(n^2): check pairs formed between points of both nodes individually
-        return ptslc_dualsumw_in_range_sq(&node1->data, &node2->data, rmin * rmin, rmax * rmax);
+        return ptslc_dualsumw_in_range_sq(
+            &node1->data,
+            &node2->data,
+            rmin * rmin,
+            rmax * rmax
+        );
     }
 
     return 0.0;

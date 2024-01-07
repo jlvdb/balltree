@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "error_handling.h"
 #include "point.h"
 #include "ballnode.h"
 #include "balltree.h"
@@ -14,13 +15,13 @@ BallTree* balltree_build(const PointBuffer *buffer) {
 BallTree* balltree_build_leafsize(const PointBuffer *buffer, int leafsize) {
     int size = buffer->size;
     if (size < 1) {
-        fprintf(stderr, "ERROR: need at least one input data point to build a tree\n");
+        PRINT_ERR_MSG("need at least one input data point to build a tree\n");
         return NULL;
     }
 
     BallTree *tree = (BallTree*)malloc(sizeof(BallTree));
     if (tree == NULL) {
-        fprintf(stderr, "ERROR: BallTree root allocation failed\n");
+        PRINT_ERR_MSG("BallTree root allocation failed\n");
         return NULL;
     }
     tree->leafsize = leafsize;
