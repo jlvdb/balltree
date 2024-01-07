@@ -2,12 +2,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "error_handling.h"
 #include "point.h"
 #include "ballnode.h"
 
 #define TRUE  1
 #define FALSE 0
 
+typedef struct {
+    double min;
+    double max;
+} Limits;
+
+static Limits limits_new();
+static void limits_update(Limits *limits, double value);
+static double limits_get_range(Limits *limits);
 static inline void point_swap(Point *p1, Point *p2);
 static inline double point_get_coord(const Point *point, enum Axis axis);
 static double ptslc_sum_weights(const PointSlice *);
@@ -19,6 +28,22 @@ static int ptslc_quickselect(PointSlice *slice, int partition_idx, enum Axis axi
 static int ptslc_partition_maxspread_axis(PointSlice *slice);
 static BallNode *bnode_init(PointBuffer *buffer, int start, int end);
 
+
+static Limits limits_new() {
+    return (Limits){INFINITY, -INFINITY};
+}
+
+static void limits_update(Limits *limits, double value) {
+    if (value < limits->min) {
+        limits->min = value;
+    } else if (value > limits->max) {
+        limits->max = value;
+    }
+}
+
+static double limits_get_range(Limits *limits) {
+    return limits->max - limits->min;
+}
 
 static inline void point_swap(Point *p1, Point *p2) {
     Point temp = *p1;
@@ -71,45 +96,24 @@ static double ptslc_get_maxdist(const PointSlice *slice, Point *center) {
 }
 
 static enum Axis ptslc_get_maxspread_axis(const PointSlice *slice) {
-    double x_min = INFINITY;
-    double y_min = x_min;
-    double z_min = x_min;
-
-    double x_max = -INFINITY;
-    double y_max = x_max;
-    double z_max = x_max;
+    Limits x_lim = limits_new();
+    Limits y_lim = limits_new();
+    Limits z_lim = limits_new();
 
     Point *points = slice->points;
-    double xi, yi, zi;
     for (int i = slice->start; i < slice->end; ++i) {
-        Point point = points[i];
-
-        xi = point.x;
-        if (xi < x_min) {
-            x_min = xi;
-        } else if (xi > x_max) {
-            x_max = xi;
-        }
-        yi = point.y;
-        if (yi < y_min) {
-            y_min = yi;
-        } else if (yi > y_max) {
-            y_max = yi;
-        }
-        zi = point.z;
-        if (zi < z_min) {
-            z_min = zi;
-        } else if (zi > z_max) {
-            z_max = zi;
-        }
+        Point *point = points + i;
+        limits_update(&x_lim, point->x);
+        limits_update(&y_lim, point->y);
+        limits_update(&z_lim, point->z);
     }
 
-    double x_spread = x_max - x_min;
-    double y_spread = y_max - y_min;
-    double z_spread = z_max - z_min;
-    if (x_spread > y_spread && x_spread > z_spread) {
+    double x_range = limits_get_range(&x_lim);
+    double y_range = limits_get_range(&y_lim);
+    double z_range = limits_get_range(&z_lim);
+    if (x_range > y_range && x_range > z_range) {
         return (enum Axis)X;
-    } else if (y_spread > z_spread) {
+    } else if (y_range > z_range) {
         return (enum Axis)Y;
     } else {
         return (enum Axis)Z;
@@ -137,11 +141,16 @@ static int ptslc_partition(PointSlice *slice, int pivot_idx, enum Axis axis) {
     return partition_idx;
 }
 
-static int ptslc_quickselect(PointSlice *slice, int partition_idx, enum Axis axis) {
+static int ptslc_quickselect(
+    PointSlice *slice,
+    int partition_idx,
+    enum Axis axis
+) {
     if (slice->start < slice->end) {
         int pivot_idx = (slice->start + slice->end) / 2;
         pivot_idx = ptslc_partition(slice, pivot_idx, axis);
 
+        // case: the paritioning element falls into the lower value range
         if (pivot_idx < partition_idx) {
             PointSlice subslice = {
                 .start = pivot_idx + 1,
@@ -151,6 +160,7 @@ static int ptslc_quickselect(PointSlice *slice, int partition_idx, enum Axis axi
             pivot_idx = ptslc_quickselect(&subslice, partition_idx, axis);
         }
         
+        // case: the paritioning element falls into the higher value range
         else if (pivot_idx > partition_idx) {
             PointSlice subslice = {
                 .start = slice->start,
@@ -174,7 +184,7 @@ static int ptslc_partition_maxspread_axis(PointSlice *slice) {
 static BallNode *bnode_init(PointBuffer *buffer, int start, int end) {
     BallNode *node = (BallNode *)calloc(1, sizeof(BallNode));
     if (node == NULL) {
-        fprintf(stderr, "ERROR: BallTree node allocation failed\n");
+        PRINT_ERR_MSG("BallTree node allocation failed\n");
         return NULL;
     }
 
@@ -185,6 +195,7 @@ static BallNode *bnode_init(PointBuffer *buffer, int start, int end) {
     };
     node->center = ptslc_get_mean(&node->data);
     node->radius = ptslc_get_maxdist(&node->data, &node->center);
+    // remaining member default to 0.0 or NULL
     return node;
 }
 
@@ -193,30 +204,30 @@ BallNode *bnode_build(PointBuffer *buffer, int start, int end, int leafsize) {
     if (node == NULL) {
         return NULL;
     }
-    PointSlice *slice = &node->data;
 
+    // case: leaf node
     if (end - start <= leafsize) {
-        // finalize as leaf node
-        node->sum_weight = ptslc_sum_weights(slice);
+        node->sum_weight = ptslc_sum_weights(&node->data);
     }
-    
+
+    // case: regular node with childs    
     else {
-        // partition points and create children
-        int split_idx = ptslc_partition_maxspread_axis(slice);
+        // partition points at median of axis with max. value range (split-axis)
+        int split_idx = ptslc_partition_maxspread_axis(&node->data);
         if (split_idx == -1) {
-            fprintf(stderr, "ERROR: could not determine median element for partitioning\n");
+            PRINT_ERR_MSG("could not determine median element for partitioning\n");
             bnode_free(node);
             return NULL;
         }
 
-        // create left child from the set points of with lower split-axis values
+        // create left child from set points of with lower split-axis values
         node->left = bnode_build(buffer, start, split_idx, leafsize);
         if (node->left == NULL) {
             bnode_free(node);
             return NULL;
         }
 
-        // create right child from the set of points with larger split-axis values
+        // create right child from set of points with larger split-axis values
         node->right = bnode_build(buffer, split_idx, end, leafsize);
         if (node->right == NULL) {
             bnode_free(node);
@@ -240,5 +251,6 @@ void bnode_free(BallNode *node) {
 }
 
 int bnode_is_leaf(const BallNode *node) {
+    // leaf nodes have no childs
     return (node->left == NULL && node->right == NULL) ? TRUE : FALSE;
 }

@@ -2,6 +2,7 @@
 #include <time.h>
 #include <locale.h>
 
+#include "error_handling.h"
 #include "point.h"
 #include "balltree.h"
 
@@ -68,10 +69,10 @@ int main(int argc, char** argv) {
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
     printf("self found %9.0lf pairs in %7.3lf sec\n", count, elapsed);
 
+    /*
     // dump and restore
     time = clock();
     if (balltree_to_file(tree, "testing/tree.dump") != 0) {
-        ptbuf_free(buffer);
         balltree_free(tree);
         return 1;
     }
@@ -80,25 +81,27 @@ int main(int argc, char** argv) {
     time = clock();
     BallTree *tree2 = balltree_from_file("testing/tree.dump");
     if (tree2 == NULL) {
-        ptbuf_free(buffer);
         balltree_free(tree); 
         return 1;  
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
     printf("restored in %7.3lf ms\n", elapsed);
 
+    */
     balltree_free(tree);
+    /*
     count = balltree_dualcount_radius(tree2, tree2, query_radius);
     printf("self found %9.0lf pairs\n", count);
 
     balltree_free(tree2);
+    */
     return 0;
 }
 
 PointBuffer *load_data_from_file() {
     PointBuffer *buffer = ptbuf_new(256);
     if (buffer == NULL) {
-        fprintf(stderr, "ERROR: memory allocation failed\n");
+        PRINT_ERR_MSG("memory allocation failed\n");
         ptbuf_free(buffer);
         return NULL;
     }
@@ -106,7 +109,7 @@ PointBuffer *load_data_from_file() {
     static const char filepath[] = "testing/points.txt";
     FILE *file = fopen(filepath, "r");
     if (file == NULL) {
-        fprintf(stderr, "ERROR: failed to open file: %s\n", filepath);
+        PRINT_ERR_MSG("failed to open file: %s\n", filepath);
         ptbuf_free(buffer);
         return NULL;
     }
@@ -116,7 +119,7 @@ PointBuffer *load_data_from_file() {
     while (fscanf(file, "%lf %lf %lf", &point.x, &point.y, &point.z) == 3) {
         if (n_records == buffer->size) {
             if (ptbuf_resize(buffer, buffer->size * 2) != 0) {
-                fprintf(stderr, "ERROR: failed to expand buffer\n");
+                PRINT_ERR_MSG("failed to expand buffer\n");
                 ptbuf_free(buffer);
                 fclose(file);
                 return NULL;
@@ -128,7 +131,7 @@ PointBuffer *load_data_from_file() {
     fclose(file);
 
     if (n_records == 0) {
-        fprintf(stderr, "ERROR: could not read any records from file\n");
+        PRINT_ERR_MSG("could not read any records from file\n");
         ptbuf_free(buffer);
         return NULL;
     }
