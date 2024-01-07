@@ -33,7 +33,7 @@ static inline double point_get_coord(const Point *point, enum Axis axis) {
 static double ptslc_sum_weights(const PointSlice *slice) {
     double sumw = 0.0;
     Point *points = slice->points;
-    for (size_t i = slice->start; i < slice->end; ++i) {
+    for (int i = slice->start; i < slice->end; ++i) {
         Point *point_i = points + i;
         sumw += point_i->weight;
     }

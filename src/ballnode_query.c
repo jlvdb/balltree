@@ -30,7 +30,7 @@ static inline int _bnode_is_leaf(const BallNode *node) {
 static double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *point, double rad_sq) {
     double sumw = 0.0;
     Point *points = slice->points;
-    for (size_t i = slice->start; i < slice->end; ++i) {
+    for (int i = slice->start; i < slice->end; ++i) {
         Point *point_i = points + i;
         double dist_sq = _point_dist_sq(point_i, point);
         // add point weight if condition is met otherwise zero
@@ -43,7 +43,7 @@ static double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *poin
 static double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *point, double rmin_sq, double rmax_sq) {
     double sumw = 0.0;
     Point *points = slice->points;
-    for (size_t i = slice->start; i < slice->end; ++i) {
+    for (int i = slice->start; i < slice->end; ++i) {
         Point *point_i = points + i;
         double dist_sq = _point_dist_sq(point_i, point);
         // add point weight if condition is met otherwise zero
@@ -56,7 +56,7 @@ static double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *point
 static double ptslc_dualsumw_in_radius_sq(const PointSlice *slice1, const PointSlice *slice2, double rad_sq) {
     double sumw = 0.0;
     Point *points1 = slice1->points;
-    for (size_t i = slice1->start; i < slice1->end; ++i) {
+    for (int i = slice1->start; i < slice1->end; ++i) {
         Point *point1_i = points1 + i;
         sumw += point1_i->weight * ptslc_sumw_in_radius_sq(slice2, point1_i, rad_sq);
     }
@@ -66,7 +66,7 @@ static double ptslc_dualsumw_in_radius_sq(const PointSlice *slice1, const PointS
 static double ptslc_dualsumw_in_range_sq(const PointSlice *slice1, const PointSlice *slice2, double rmin_sq, double rmax_sq) {
     double sumw = 0.0;
     Point *points1 = slice1->points;
-    for (size_t i = slice1->start; i < slice1->end; ++i) {
+    for (int i = slice1->start; i < slice1->end; ++i) {
         Point *point1_i = points1 + i;
         sumw += point1_i->weight * ptslc_sumw_in_range_sq(slice2, point1_i, rmin_sq, rmax_sq);
     }
