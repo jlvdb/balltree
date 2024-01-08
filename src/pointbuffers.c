@@ -2,11 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SUCCESS 0
-#define FAILED  1
-
-#include "error_handling.h"
 #include "point.h"
+#include "balltree_macros.h"
 
 PointBuffer *ptbuf_new(int size) {
     if (size < 1) {
@@ -78,19 +75,19 @@ void ptbuf_free(PointBuffer *buffer) {
 int ptbuf_resize(PointBuffer *buffer, int size) {
     if (size < 1) {
         PRINT_ERR_MSG("PointBuffer size must be positive\n");
-        return FAILED;
+        return BTR_FAILED;
     }
 
     size_t n_bytes = size * sizeof(Point);
     Point *points = (Point*)realloc(buffer->points, n_bytes);
     if (points == NULL) {
         PRINT_ERR_MSG("PointBuffer resizing failed\n");
-        return FAILED;
+        return BTR_FAILED;
     }
 
     buffer->size = size;
     buffer->points = points;
-    return SUCCESS;
+    return BTR_SUCCESS;
 }
 
 PointBuffer *ptbuf_copy(const PointBuffer *buffer) {

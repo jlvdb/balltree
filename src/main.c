@@ -2,9 +2,9 @@
 #include <time.h>
 #include <locale.h>
 
-#include "error_handling.h"
 #include "point.h"
 #include "balltree.h"
+#include "balltree_macros.h"
 
 PointBuffer *load_data_from_file();
 
@@ -69,7 +69,6 @@ int main(int argc, char** argv) {
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
     printf("self found %9.0lf pairs in %7.3lf sec\n", count, elapsed);
 
-    /*
     // dump and restore
     time = clock();
     if (balltree_to_file(tree, "testing/tree.dump") != 0) {
@@ -87,14 +86,11 @@ int main(int argc, char** argv) {
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
     printf("restored in %7.3lf ms\n", elapsed);
 
-    */
     balltree_free(tree);
-    /*
     count = balltree_dualcount_radius(tree2, tree2, query_radius);
     printf("self found %9.0lf pairs\n", count);
 
     balltree_free(tree2);
-    */
     return 0;
 }
 

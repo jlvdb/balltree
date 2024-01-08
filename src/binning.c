@@ -1,24 +1,22 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
 #include "binning.h"
 
-#define TRUE  1
-#define FALSE 0
-
 #define EQUAL_WIDTH_REL_TOL 1e-12
 
 struct Binning binning_from_edges(const double *edges, int n_bins, int closed_left)
 {
-    int equal_width = TRUE;
+    int equal_width = true;
     double last_width = edges[1] - edges[0];
     for (int i = 1; i < n_bins; ++i) {
         double left = edges[i];
         double right = edges[i+1];
         double width = right - left;
         if (fabs((width - last_width) / last_width) > EQUAL_WIDTH_REL_TOL) {
-            equal_width = FALSE;
+            equal_width = false;
             break;
         }
     }

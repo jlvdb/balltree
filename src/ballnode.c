@@ -1,13 +1,11 @@
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "error_handling.h"
 #include "point.h"
 #include "ballnode.h"
-
-#define TRUE  1
-#define FALSE 0
+#include "balltree_macros.h"
 
 typedef struct {
     double min;
@@ -17,6 +15,7 @@ typedef struct {
 static Limits limits_new();
 static void limits_update(Limits *limits, double value);
 static double limits_get_range(Limits *limits);
+
 static inline void point_swap(Point *p1, Point *p2);
 static inline double point_get_coord(const Point *point, enum Axis axis);
 static double ptslc_sum_weights(const PointSlice *);
@@ -252,5 +251,5 @@ void bnode_free(BallNode *node) {
 
 int bnode_is_leaf(const BallNode *node) {
     // leaf nodes have no childs
-    return (node->left == NULL && node->right == NULL) ? TRUE : FALSE;
+    return (node->left == NULL && node->right == NULL) ? true : false;
 }

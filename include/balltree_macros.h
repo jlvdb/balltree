@@ -1,5 +1,5 @@
-#ifndef ERROR_HANDLING_H
-#define ERROR_HANDLING_H
+#ifndef BALLTREE_MACROS_H
+#define BALLTREE_MACROS_H
 
 #include <stdio.h>
 
@@ -9,4 +9,7 @@
     fprintf(stderr, "\n"); \
 } while (0)
 
-#endif  // ERROR_HANDLING_H
+#define BTR_SUCCESS 0
+#define BTR_FAILED  1
+
+#endif  // BALLTREE_MACROS_H
