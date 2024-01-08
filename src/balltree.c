@@ -90,3 +90,17 @@ double balltree_dualcount_range(
 ) {
     return bnode_dualcount_range(tree1->root, tree2->root, rmin, rmax);
 }
+
+StatsVector *balltree_collect_stats(const BallTree *tree) {
+    int num_nodes = balltree_count_nodes(tree);
+    StatsVector *vec = statvec_new_reserve(num_nodes);
+    if (vec == NULL) {
+        return NULL;
+    }
+
+    if (bnode_collect_stats(tree->root, vec, 0) == BTR_FAILED) {
+        statvec_free(vec);
+        return NULL;
+    }
+    return vec;
+}

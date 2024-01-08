@@ -1,9 +1,7 @@
-#include <math.h>
-#include <stdbool.h>
-#include <stdio.h>
+#include <stdlib.h>
 
 #include "ballnode.h"
-#include "balltree_utils.h"
+#include "balltree_macros.h"
 
 StatsVector *statvec_new() {
     return statvec_new_reserve(32);
@@ -23,6 +21,7 @@ StatsVector *statvec_new_reserve(int reserve_size) {
         free(vec);
         return NULL;
     }
+    return vec;
 }
 
 void statvec_free(StatsVector *vec) {
@@ -32,20 +31,20 @@ void statvec_free(StatsVector *vec) {
     free(vec);
 }
 
-enum Status statvec_resize(StatsVector *vec, int size) {
+int statvec_resize(StatsVector *vec, int size) {
     if (size < 1) {
         PRINT_ERR_MSG("StatsVector size must be positive\n");
-        return (enum Status)FAILED;
+        return BTR_FAILED;
     }
 
-    size_t n_bytes = size * sizeof(Point);
-    Point *points = (Point*)realloc(vec->stats, n_bytes);
-    if (points == NULL) {
+    size_t n_bytes = size * sizeof(NodeStats);
+    NodeStats *stats = (NodeStats *)realloc(vec->stats, n_bytes);
+    if (stats == NULL) {
         PRINT_ERR_MSG("StatsVector resizing failed\n");
         return BTR_FAILED;
-
     }
 
+    vec->stats = stats;
     vec->size = size;
     vec->end = (vec->end > size) ? size : vec->end;
     return BTR_SUCCESS;
