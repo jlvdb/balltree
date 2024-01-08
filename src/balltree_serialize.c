@@ -1,312 +1,339 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "point.h"
 #include "balltree.h"
 #include "ballnode.h"
+#include "balltree_macros.h"
 
-#define SUCCESS 0
-#define FAILED  1
-
-#define TRUE  1
-#define FALSE 0
-
-typedef struct {
-    int start;
-    int end;
-} PointSliceSerialized;
-
-typedef struct {
-    Point center;
-    double radius;
-    double sum_weight;
-    // the following members differ from BallNode
-    int left;   // store the index of the childs in BallNodeBuffer
-    int right;  // --
-    PointSliceSerialized data;  // does not include the buffer pointer
-} BallNodeSerialized;
+static int ptbuf_write(const PointBuffer *buffer, FILE *file);
+static PointBuffer *ptbuf_read(int n_items, FILE *file);
 
 typedef struct {
     int size;
-    BallNodeSerialized *nodes;
-} SerializedBuffer;
+    BallNode *nodes;
+    int next_free;
+} BNodeBuffer;
+
+static BNodeBuffer *bnodebuffer_new(int size);
+static void bnodebuffer_free(BNodeBuffer *buffer);
+static int bnodebuffer_get_next_free(BNodeBuffer *buffer);
+static int bnodebuffer_write(const BNodeBuffer *buffer, FILE *file);
+static BNodeBuffer *bnodebuffer_read(int n_items, FILE *file);
 
 typedef struct {
-    int size;
-    int bytes;
+    int n_items;
+    int itemsize;
 } SectionHeader;
 
 typedef struct {
     int leafsize;
-    SectionHeader nodes;
     SectionHeader points;
+    SectionHeader nodes;
 } FileHeader;
 
-static SerializedBuffer *serializedbuffer_new(int size);
-static void serializedbuffer_free(SerializedBuffer *buffer);
-static int bnode_serialise(SerializedBuffer *buffer, BallNode *node, int *next_index, int insertion_index);
-static BallNode *bnode_deserialise(SerializedBuffer *buffer, const PointBuffer *points, int index);
+static FileHeader *fileheader_new(const BallTree *tree);
+static int fileheader_write(const FileHeader *header, FILE *file);
+static FileHeader *fileheader_read(FILE *file);
+
+static inline intptr_t child_ptr_substitute(const BallNode *child, BNodeBuffer *buffer);
+static int bnode_serialise(const BallNode *node, BNodeBuffer *buffer, int buf_idx);
+static BallNode *bnode_deserialise(const BNodeBuffer *buffer, Point *points, int buf_idx);
 
 
-static SerializedBuffer *serializedbuffer_new(int size) {
-    if (size < 1) {
-        fprintf(stderr, "ERROR: PointBuffer size must be positive\n");
-        return NULL;
+static int ptbuf_write(const PointBuffer *buffer, FILE *file) {
+    size_t n_items = (size_t)buffer->size;
+    size_t n_written = fwrite(buffer->points, sizeof(Point), n_items, file);
+    if (n_written != n_items) {
+        PRINT_ERR_MSG("failed to write %zu data points\n", n_items);
+        return BTR_FAILED;
     }
+    return BTR_SUCCESS;
+}
 
-    SerializedBuffer *buffer = (SerializedBuffer *)malloc(sizeof(SerializedBuffer));
+static PointBuffer *ptbuf_read(int n_items, FILE *file) {
+    PointBuffer *buffer = ptbuf_new(n_items);
     if (buffer == NULL) {
-        fprintf(stderr, "ERROR: SerializedBuffer allocation failed\n");
         return NULL;
     }
 
-    size_t n_bytes = size * sizeof(BallNodeSerialized);
-    BallNodeSerialized *nodes = (BallNodeSerialized *)malloc(n_bytes);
-    if (nodes == NULL) {
-        fprintf(stderr, "ERROR: SerializedBuffer memory allocation failed\n");
-        free(buffer);
+    size_t n_read = fread(buffer->points, sizeof(Point), n_items, file);
+    if (n_read != n_items) {
+        ptbuf_free(buffer);
+        PRINT_ERR_MSG("failed to read %d data points\n", n_items);
         return NULL;
     }
-
-    buffer->size = size;
-    buffer->nodes = nodes;
     return buffer;
 }
 
-static void serializedbuffer_free(SerializedBuffer *buffer) {
+static BNodeBuffer *bnodebuffer_new(int size) {
+    BNodeBuffer *nodebuffer = (BNodeBuffer *)malloc(sizeof(BNodeBuffer));
+    if (nodebuffer == NULL) {
+        return NULL;
+    }
+
+    nodebuffer->size = size;
+    nodebuffer->next_free = 0;
+    nodebuffer->nodes = (BallNode *)malloc(size * sizeof(BallNode));
+    if (nodebuffer->nodes == NULL) {
+        return NULL;
+    }
+    return nodebuffer;
+}
+
+static void bnodebuffer_free(BNodeBuffer *buffer) {
     if (buffer->nodes != NULL) {
         free(buffer->nodes);
     }
-    free(buffer);
 }
 
-static int bnode_serialise(SerializedBuffer *buffer, BallNode *node, int *next_index, int insertion_index) {
-    if (*next_index > buffer->size) {
-        return FAILED;
+static int bnodebuffer_get_next_free(BNodeBuffer *buffer) {
+    return (buffer->next_free)++;
+}
+
+static int bnodebuffer_write(const BNodeBuffer *buffer, FILE *file) {
+    size_t n_items = (size_t)buffer->size;
+    size_t n_written = fwrite(buffer->nodes, sizeof(BallNode), n_items, file);
+    if (n_written != n_items) {
+        PRINT_ERR_MSG("failed to write %zu nodes\n", n_items);
+        return BTR_FAILED;
+    }
+    return BTR_SUCCESS;
+}
+
+static BNodeBuffer *bnodebuffer_read(int n_items, FILE *file) {
+    BNodeBuffer *buffer = bnodebuffer_new(n_items);
+    if (buffer == NULL) {
+        return NULL;
     }
 
-    // use next free index in the buffer to reference left and right childs or
-    // -1 to represent NULL pointer
-    int index_left = (node->left != NULL) ? (*next_index)++ : -1;
-    int index_right = (node->left != NULL) ? (*next_index)++ : -1;
+    size_t n_read = fread(buffer->nodes, sizeof(BallNode), n_items, file);
+    if (n_read != n_items) {
+        PRINT_ERR_MSG("failed to read %d nodes\n", n_items);
+        bnodebuffer_free(buffer);
+        return NULL;
+    }
+    return buffer;
+}
 
-    // serialize data and insert into output buffer
-    buffer->nodes[insertion_index] = (BallNodeSerialized){
-        .center = node->center,
-        .radius = node->radius,
-        .sum_weight = node->sum_weight,
-        .left = index_left,
-        .right = index_right,
-        .data = (PointSliceSerialized){
-            .start = node->data.start,
-            .end = node->data.end,
-        },
+static FileHeader *fileheader_new(const BallTree *tree) {
+    FileHeader *header = (FileHeader *)malloc(sizeof(FileHeader));
+    if (header == NULL) {
+        return NULL;
+    }
+
+    header->leafsize = tree->leafsize;
+    header->points = (SectionHeader){
+        .n_items = tree->data.size,
+        .itemsize = sizeof(*tree->data.points)
     };
-
-    // handle the childs if any
-    int state;
-    if (index_left != -1) {
-        state = bnode_serialise(buffer, node->left, next_index, index_left);
-        if (state == FAILED) {
-            return FAILED;
-        }
-    }
-    if (index_right != -1) {
-        state = bnode_serialise(buffer, node->right, next_index, index_right);
-        if (state == FAILED) {
-            return FAILED;
-        }
-    }
-    return SUCCESS;
+    header->nodes = (SectionHeader){
+        .n_items = balltree_count_nodes(tree),
+        .itemsize = sizeof(*tree->root)
+    };
+    return header;
 }
 
-static BallNode *bnode_deserialise(SerializedBuffer *buffer, const PointBuffer *points, int index) {
-    if (index >= buffer->size) {
-        fprintf(stderr, "ERROR: node index exceeds node array size\n");
-        return NULL;
+static int fileheader_write(const FileHeader *header, FILE *file) {
+    const size_t n_items = 1;
+    size_t n_written = fwrite(header, sizeof(*header), n_items, file);
+    if (n_written != n_items) {
+        PRINT_ERR_MSG("failed to write file header\n");
+        return BTR_FAILED;
     }
-    BallNodeSerialized *serialized = buffer->nodes + index;
-    if (serialized->data.end > points->size) {
-        fprintf(stderr, "ERROR: point buffer does not match data slice expected by node\n");
+    return BTR_SUCCESS;
+}
+
+static FileHeader *fileheader_read(FILE *file) {
+    FileHeader *header = (FileHeader *)malloc(sizeof(FileHeader));
+    if (header == NULL) {
         return NULL;
     }
 
-    // reconstruct the original BallNode
+    const size_t n_items = 1;
+    size_t n_read = fread(header, sizeof(FileHeader), n_items, file);
+    if (n_read != n_items) {
+        PRINT_ERR_MSG("failed to read file header\n");
+        return NULL;
+    }
+    return header;
+}
+
+static inline intptr_t child_ptr_substitute(const BallNode *child, BNodeBuffer *buffer) {
+    return (child == NULL) ? 0 : bnodebuffer_get_next_free(buffer);
+}
+
+static int bnode_serialise(const BallNode *node, BNodeBuffer *buffer, int buf_idx) {
+    if (buffer->next_free > buffer->size) {
+        PRINT_ERR_MSG("buffer is too small to store further nodes");
+        return BTR_FAILED;
+    }
+
+    // insert into buffer
+    BallNode *stored = buffer->nodes + buf_idx;
+    *stored = *node;
+    stored->data.points = NULL;  // pointer not valid after deserialisation
+
+    // replace pointers to childs by index in buffer they will be stored at
+    intptr_t left_idx = child_ptr_substitute(node->left, buffer);
+    intptr_t right_idx = child_ptr_substitute(node->right, buffer);
+    stored->left = (BallNode *)left_idx;
+    stored->right = (BallNode *)right_idx;
+
+    // serialise childs recursively
+    if (left_idx != 0) {
+        if (bnode_serialise(node->left, buffer, left_idx) == BTR_FAILED) {
+            return BTR_FAILED;
+        }
+    }
+    if (right_idx != 0) {
+        if (bnode_serialise(node->right, buffer, right_idx) == BTR_FAILED) {
+            return BTR_FAILED;
+        }
+    }
+    return BTR_SUCCESS;
+}
+
+int balltree_to_file(const BallTree *tree, const char *path) {
+    FILE *file = fopen(path, "wb");
+    if (file == NULL) {
+        PRINT_ERR_MSG("failed to open file: %s\n", path);
+        return BTR_FAILED;
+    }
+
+    // create the file header and write it to the file
+    FileHeader *header = fileheader_new(tree);
+    if (header == NULL) {
+        goto err_close_file;
+    }
+    if (fileheader_write(header, file) == BTR_FAILED) {
+        goto err_dealloc_header;
+    }
+
+    // append the tree's data points to the file
+    if (ptbuf_write(&tree->data, file) == BTR_FAILED) {
+        goto err_dealloc_header;
+    }
+
+    // serialise the tree nodes and append them to the file
+    BNodeBuffer *nodebuffer = bnodebuffer_new(header->nodes.n_items);
+    if (nodebuffer == NULL) {
+        goto err_dealloc_header;
+    }
+    free(header);
+    int root_index = bnodebuffer_get_next_free(nodebuffer);
+    if (bnode_serialise(tree->root, nodebuffer, root_index) == BTR_FAILED) {
+        bnodebuffer_free(nodebuffer);
+        goto err_close_file;
+    }
+    if (bnodebuffer_write(nodebuffer, file) == BTR_FAILED) {
+        bnodebuffer_free(nodebuffer);
+        goto err_close_file;
+    }
+
+    bnodebuffer_free(nodebuffer);
+    if (fflush(file) == EOF) {
+        PRINT_ERR_MSG("failed to flush file\n");
+        goto err_close_file;
+    }
+    fclose(file);
+    return BTR_SUCCESS;
+
+err_dealloc_header:
+    free(header);
+err_close_file:
+    fclose(file);
+    return BTR_FAILED;
+}
+
+static BallNode *bnode_deserialise(
+    const BNodeBuffer *buffer,
+    Point *points,
+    int buf_idx
+) {
+    if (buf_idx >= buffer->size) {
+        PRINT_ERR_MSG("node index exceeds node buffer size\n");
+        return NULL;
+    }
+    BallNode *stored = buffer->nodes + buf_idx;
+
+    // create a new node instance
     BallNode *node = (BallNode *)malloc(sizeof(BallNode));
     if (node == NULL) {
-        fprintf(stderr, "ERROR: failed to allocate a new node\n");
         return NULL;
     }
-    node->center = serialized->center;
-    node->radius = serialized->radius;
-    node->sum_weight = serialized->sum_weight;
-    node->data = (PointSlice){
-        .start = serialized->data.start,
-        .end = serialized->data.end,
-        .points = points->points,
-    };
-    node->left = NULL;
-    node->right = NULL;
+    *node = *stored;
 
-    // attach any missing childs
-    if (serialized->left != -1) {
-        node->left = bnode_deserialise(buffer, points, serialized->left);
+    // restore the pointers with valid addresses
+    node->data.points = points;
+    int left_idx = (intptr_t)node->left;
+    int right_idx = (intptr_t)node->right;
+    if (left_idx != 0) {
+        node->left = bnode_deserialise(buffer, points, left_idx);
         if (node->left == NULL) {
-            bnode_free(node);
+            free(node);
             return NULL;
         }
     }
-    if (serialized->right != -1) {
-        node->right = bnode_deserialise(buffer, points, serialized->right);
+    if (right_idx != 0) {
+        node->right = bnode_deserialise(buffer, points, right_idx);
         if (node->right == NULL) {
-            bnode_free(node);
+            bnode_free(node->left);
+            free(node);
             return NULL;
         }
     }
     return node;
 }
 
-int balltree_to_file(const BallTree *tree, const char *path) {
-    size_t elements_written;
-    FILE *file = fopen(path, "wb");
-    if (file == NULL) {
-        fprintf(stderr, "ERROR: failed to open file\n");
-        return FAILED;
-    }
-
-    // write the header
-    int num_nodes = balltree_count_nodes(tree);
-    int num_points = tree->data.size;
-    FileHeader header = {
-        .leafsize = tree->leafsize,
-        .nodes = {
-            .size = num_nodes,
-            .bytes = num_nodes * sizeof(BallNodeSerialized)
-        },
-        .points = {
-            .size = num_points,
-            .bytes = num_points * sizeof(Point)
-        },
-    };
-    elements_written = fwrite(&header, sizeof(FileHeader), 1, file);
-    if (elements_written != 1) {
-        fprintf(stderr, "ERROR: failed to write header\n");
-        fclose(file);
-        return FAILED;
-    }
-
-    // append serialised point buffer
-    elements_written = fwrite(tree->data.points, sizeof(Point), header.points.size, file);
-    if (elements_written != header.points.size) {
-        fprintf(stderr, "ERROR: failed to write data points\n");
-        fclose(file);
-        return FAILED;
-    }
-
-    // serialise nodes into buffer
-    SerializedBuffer *node_buffer = serializedbuffer_new(header.nodes.size);
-    if (node_buffer == NULL) {
-        fclose(file);
-        return FAILED;
-    }
-    int index_tracker = 1;  // 0 is already reserved for root node
-    int success = bnode_serialise(node_buffer, tree->root, &index_tracker, 0);
-    if (success == FAILED) {
-        serializedbuffer_free(node_buffer);
-        fclose(file);
-        return FAILED;
-    }
-
-    // append serialised node buffer
-    elements_written = fwrite(node_buffer->nodes, sizeof(BallNodeSerialized), header.nodes.size, file);
-    serializedbuffer_free(node_buffer);
-    if (elements_written != header.nodes.size) {
-        fprintf(stderr, "ERROR: failed to write node data\n");
-        fclose(file);
-        return FAILED;
-    }
-
-    if (fflush(file) == EOF) {
-        fprintf(stderr, "ERROR: failed to flush file\n");
-        fclose(file);
-        return FAILED;
-    }
-
-    fclose(file);
-    return SUCCESS;
-}
-
 BallTree* balltree_from_file(const char *path) {
-    size_t elements_read;
-    FILE *file = fopen(path, "rb");
-    if (file == NULL) {
-        fprintf(stderr, "ERROR: failed to open file\n");
+    BallTree *tree = (BallTree *)malloc(sizeof(BallTree));
+    if (tree == NULL) {
         return NULL;
     }
 
-    // read header
-    FileHeader header;
-    elements_read = fread(&header, sizeof(FileHeader), 1, file);
-    if (elements_read != 1) {
-        fprintf(stderr, "ERROR: failed to read header\n");
-        goto error_close_file;
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        PRINT_ERR_MSG("failed to open file: %s\n", path);
+        goto err_dealloc_tree;
     }
 
-    // allocate all memory required
-    BallTree *tree = (BallTree *)malloc(sizeof(BallTree));
-    if (tree == NULL) {
-        fprintf(stderr, "ERROR: failed to allocate tree\n");
-        goto error_close_file;
+    // read header from the file
+    FileHeader *header = fileheader_read(file);
+    if (header == NULL) {
+        goto err_close_file;
     }
-    Point *points = (Point *)malloc(header.points.bytes);
+    tree->leafsize = header->leafsize;
+
+    // read tree's data points from the file
+    PointBuffer *points = ptbuf_read(header->points.n_items, file);
     if (points == NULL) {
-        fprintf(stderr, "ERROR: failed to allocate point buffer\n");
-        goto error_dealloc_tree;
+        goto err_dealloc_header;
     }
-    SerializedBuffer *node_buffer = serializedbuffer_new(header.nodes.size);
-    if (node_buffer == NULL) {
-        fprintf(stderr, "ERROR: failed to allocate node data\n");
-        goto error_dealloc_points;
-    }
+    tree->data = *points;  // move ownership of underlying point buffer
+    free(points);
 
-    // read point buffer
-    elements_read = fread(points, sizeof(Point), header.points.size, file);
-    if (elements_read != header.points.size) {
-        fprintf(stderr, "ERROR: failed to read data points\n");
-        goto error_dealloc_nodes;
+    // read the tree nodes from the file and deserialise them
+    BNodeBuffer *nodebuffer = bnodebuffer_read(header->nodes.n_items, file);
+    if (nodebuffer == NULL) {
+        goto err_dealloc_header;  // points deallocated at err_dealloc_tree
     }
-
-    // read node data
-    elements_read = fread(node_buffer->nodes, sizeof(BallNodeSerialized), header.nodes.size, file);
-    if (elements_read != header.nodes.size) {
-        fprintf(stderr, "ERROR: failed to read node data\n");
-        goto error_dealloc_nodes;
-    }
-
-    // populate the tree
-    tree->leafsize = header.leafsize;
-    tree->data = (PointBuffer){
-        .size = header.points.size,
-        .points = points,
-    };
-    tree->root = bnode_deserialise(node_buffer, &tree->data, 0);
+    tree->root = bnode_deserialise(nodebuffer, tree->data.points, 0);
+    bnodebuffer_free(nodebuffer);
     if (tree->root == NULL) {
-        fprintf(stderr, "ERROR: failed to reconstruct tree\n");
-        goto error_dealloc_nodes;
+        goto err_dealloc_header;  // nodes deallocated at err_dealloc_tree
     }
 
-    serializedbuffer_free(node_buffer);
+    free(header);
     fclose(file);
     return tree;
 
-    // alternative exit route which cleans up buffers
-error_dealloc_nodes:
-    serializedbuffer_free(node_buffer);
-error_dealloc_points:
-    free(points);
-error_dealloc_tree:
-    free(tree);
-error_close_file:
+err_dealloc_header:
+    free(header);
+err_close_file:
     fclose(file);
+err_dealloc_tree:
+    balltree_free(tree);
     return NULL;
 }
