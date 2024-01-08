@@ -9,7 +9,7 @@
 PointBuffer *load_data_from_file();
 
 int main(int argc, char** argv) {
-    Point query_point = {0.0, 0.0, 0.0, 0.5};
+    Point query_point;
     double query_radius = 0.2;
     int leafsize = 20;
 
@@ -31,6 +31,8 @@ int main(int argc, char** argv) {
     int n_records = buffer->size;
     printf("read %'d records in %.3lf sec\n", n_records, elapsed);
 
+    query_point = buffer->points[0];
+
     // build the ball tree, show the elapsed time
     time = clock();
     tree = balltree_build_leafsize(buffer, leafsize);
@@ -49,7 +51,7 @@ int main(int argc, char** argv) {
         for (int i = 0; i < imax ; ++i)
             count = balltree_count_radius(tree, &query_point, query_radius);
         elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
-        printf("%3dx found %9.0lf pairs in %7.3lf ms\n", imax, count, elapsed);
+        printf("%3dx found %11.0lf pairs in %7.3lf ms\n", imax, count, elapsed);
         imax *= 10;
     }
 
@@ -60,14 +62,14 @@ int main(int argc, char** argv) {
         count += balltree_count_radius(tree, buffer->points + i, query_radius);
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
-    printf(" all found %9.0lf pairs in %7.3lf sec\n", count, elapsed);
+    printf(" all found %11.0lf pairs in %7.3lf sec\n", count, elapsed);
     ptbuf_free(buffer);  // no longer needed
 
     // query with itself, show the elapsed time
     time = clock();
     count = balltree_dualcount_radius(tree, tree, query_radius);
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
-    printf("self found %9.0lf pairs in %7.3lf sec\n", count, elapsed);
+    printf("self found %11.0lf pairs in %7.3lf sec\n", count, elapsed);
 
     // dump and restore
     time = clock();
@@ -88,7 +90,7 @@ int main(int argc, char** argv) {
 
     balltree_free(tree);
     count = balltree_dualcount_radius(tree2, tree2, query_radius);
-    printf("self found %9.0lf pairs\n", count);
+    printf("self found %11.0lf pairs\n", count);
 
     balltree_free(tree2);
     return 0;
@@ -102,7 +104,7 @@ PointBuffer *load_data_from_file() {
         return NULL;
     }
 
-    static const char filepath[] = "testing/points.txt";
+    static const char filepath[] = "testing/BOSS.txt";
     FILE *file = fopen(filepath, "r");
     if (file == NULL) {
         PRINT_ERR_MSG("failed to open file: %s\n", filepath);
@@ -111,7 +113,7 @@ PointBuffer *load_data_from_file() {
     }
 
     int n_records = 0;
-    Point point = {0.0, 0.0, 0.0, 0.5};
+    Point point = {0.0, 0.0, 0.0, 1.0};
     while (fscanf(file, "%lf %lf %lf", &point.x, &point.y, &point.z) == 3) {
         if (n_records == buffer->size) {
             if (ptbuf_resize(buffer, buffer->size * 2) != 0) {
