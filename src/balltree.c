@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "error_handling.h"
 #include "point.h"
 #include "ballnode.h"
 #include "balltree.h"
+#include "balltree_macros.h"
 
 #define DEFAULT_LEAFSIZE 20
 

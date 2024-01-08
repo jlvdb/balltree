@@ -1,11 +1,10 @@
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 #include "point.h"
 #include "ballnode.h"
-
-#define TRUE  1
-#define FALSE 0
+#include "balltree_macros.h"
 
 static double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *point, double rad_sq);
 static double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *point, double rmin_sq, double rmax_sq);
@@ -24,7 +23,7 @@ static inline double _point_dist_sq(const Point *p1, const Point *p2) {
 }
 
 static inline int _bnode_is_leaf(const BallNode *node) {
-    return (node->left == NULL && node->right == NULL) ? TRUE : FALSE;
+    return (node->left == NULL && node->right == NULL) ? true : false;
 }
 
 static double ptslc_sumw_in_radius_sq(
@@ -116,7 +115,7 @@ double bnode_count_radius(
     
     // case: some points may be pairs
     else if (distance <= radius + node->radius) {
-        if (_bnode_is_leaf(node) == FALSE) {
+        if (_bnode_is_leaf(node) == false) {
             return bnode_count_radius(node->left, point, radius) +
                    bnode_count_radius(node->right, point, radius);
         }
@@ -146,7 +145,7 @@ double bnode_count_range(
 
     // case: some points may be pairs
     else if (rmin - node->radius < distance || distance <= rmax + node->radius) {
-        if (_bnode_is_leaf(node) == FALSE) {
+        if (_bnode_is_leaf(node) == false) {
             return bnode_count_range(node->left, point, rmin, rmax) +
                    bnode_count_range(node->right, point, rmin, rmax);
         }
@@ -181,7 +180,7 @@ double bnode_dualcount_radius(
         int node2_is_leaf = _bnode_is_leaf(node2);
 
         // case: both nodes can be traversed further
-        if (node1_is_leaf == FALSE && node2_is_leaf == FALSE) {
+        if (node1_is_leaf == false && node2_is_leaf == false) {
             return bnode_dualcount_radius(node1->left, node2->left, radius) +
                    bnode_dualcount_radius(node1->left, node2->right, radius) +
                    bnode_dualcount_radius(node1->right, node2->left, radius) +
@@ -189,13 +188,13 @@ double bnode_dualcount_radius(
         }
 
         // case: node1 can be traversed further
-        else if (node1_is_leaf == FALSE) {
+        else if (node1_is_leaf == false) {
             return bnode_dualcount_radius(node1->left, node2, radius) +
                    bnode_dualcount_radius(node1->right, node2, radius);
         }
 
         // case: node2 can be traversed further
-        else if (node2_is_leaf == FALSE) {
+        else if (node2_is_leaf == false) {
             return bnode_dualcount_radius(node1, node2->left, radius) +
                    bnode_dualcount_radius(node1, node2->right, radius);
         }
@@ -231,7 +230,7 @@ double bnode_dualcount_range(
         int node2_is_leaf = _bnode_is_leaf(node2);
 
         // case: both nodes can be traversed further
-        if (node1_is_leaf == FALSE && node2_is_leaf == FALSE) {
+        if (node1_is_leaf == false && node2_is_leaf == false) {
             return bnode_dualcount_range(node1->left, node2->left, rmin, rmax) +
                    bnode_dualcount_range(node1->left, node2->right, rmin, rmax) +
                    bnode_dualcount_range(node1->right, node2->left, rmin, rmax) +
@@ -239,13 +238,13 @@ double bnode_dualcount_range(
         }
 
         // case: node1 can be traversed further
-        else if (node1_is_leaf == FALSE) {
+        else if (node1_is_leaf == false) {
             return bnode_dualcount_range(node1->left, node2, rmin, rmax) +
                    bnode_dualcount_range(node1->right, node2, rmin, rmax);
         }
 
         // case: node2 can be traversed further
-        else if (node2_is_leaf == FALSE) {
+        else if (node2_is_leaf == false) {
             return bnode_dualcount_range(node1, node2->left, rmin, rmax) +
                    bnode_dualcount_range(node1, node2->right, rmin, rmax);
         }
