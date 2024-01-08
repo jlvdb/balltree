@@ -9,26 +9,28 @@ The base implementation is in C and there is a wrapper for python in development
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+
+#include "point.h"
 #include "balltree.h"
 
 PointBuffer *create_random_points(int num_points) {
     srand(time(NULL));
-    PointBuffer *points = ptbuf_new(num_points);
-    if (points == NULL) {
+    PointBuffer *buffer = ptbuf_new(num_points);
+    if (buffer == NULL) {
         return NULL;
     }
     for (int i = 0; i < num_points; ++i) {
         double x = (double)rand() / RAND_MAX;
         double y = (double)rand() / RAND_MAX;
         double z = (double)rand() / RAND_MAX;
-        points[i] = point_create(x, y, z);
+        buffer->points[i] = point_create(x, y, z);
     }
-    return points;
+    return buffer;
 }
 
 int main(int argc, char** argv) {
     // build tree from random points in range [1, 0)
-    PointBuffer *buffer = create_random_points(1'000'000);
+    PointBuffer *buffer = create_random_points(1000000);
     if (buffer == NULL) {
         return 1;
     }
