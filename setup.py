@@ -14,14 +14,19 @@ ext_modules = [
             "src/balltree.c",
             "src/balltree_serialize.c",
         ],
-        extra_compile_args=["-O3", "-march=native", "-funroll-all-loops", "-ffast-math"]
+        extra_compile_args=[
+            "-O3",
+            "-ffast-math",
+            "-march=native",
+            "-funroll-all-loops",
+        ]
     ),
 ]
 
 setup(
     name="balltree",
     author="Jan Luca van den Busch",
-    version="0.0.1",
+    version="0.1.0",
     ext_modules=cythonize(ext_modules, language_level="3"),
     include_dirs=["include", np.get_include()],
 )
