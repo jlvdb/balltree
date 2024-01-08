@@ -16,12 +16,15 @@ TARGET = $(BINDIR)/main.out
 all: $(TARGET) $(LIBS)
 
 $(TARGET): $(OBJS)
+	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) $^ -o $@
 
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c
+	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(LIBS): $(OBJS)
+	@mkdir -p $(@D)
 	$(CC) $(LDFLAGS) $^ -o $@
 
 clean:
