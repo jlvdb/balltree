@@ -6,53 +6,57 @@ from numpy.typing import NDArray
 
 
 cdef extern from "../include/point.h":
-    cdef struct Point:
+    ctypedef struct Point:
         double x
         double y
         double z
         double weight
 
-    cdef struct PointBuffer:
+    ctypedef struct PointBuffer:
         int size
         Point *points
 
-    cdef struct PointSlice:
+    ctypedef struct PointSlice:
         int start
         int end
         Point *points
 
     Point point_create(double, double, double)
-    Point point_create_weighted(double, double, double, double);
-    PointBuffer* pointbuffer_create(int)
-    void pointbuffer_free(PointBuffer*)
-    int pointbuffer_resize(PointBuffer*, int)
+    Point point_create_weighted(double, double, double, double)
+    PointBuffer *ptbuf_new(int)
+    PointBuffer *ptbuf_from_buffers(int, double *, double *, double *)
+    PointBuffer *ptbuf_from_buffers_weighted(int, double *, double *, double *, double *)
+    void ptbuf_free(PointBuffer *)
 
 
 cdef extern from "../include/ballnode.h":
-    cdef struct BallNode:
+    ctypedef struct BallNode:
         Point center
         double radius
+        double sum_weight
+        PointSlice data
         BallNode *left
         BallNode *right
-        PointSlice data
 
 
 cdef extern from "../include/balltree.h":
-    cdef struct BallTree:
+    ctypedef struct BallTree:
         BallNode *root
         PointBuffer data
         int leafsize
 
-    BallTree* balltree_build(PointBuffer*);
-    BallTree* balltree_build_leafsize(PointBuffer*, int);
-    void balltree_free(BallTree*);
-    int balltree_count_nodes(BallTree*);
-    int balltree_to_file(BallTree*, char*);
-    BallTree* balltree_from_file(char*);
+    BallTree *balltree_build(PointBuffer *)
+    BallTree *balltree_build_leafsize(PointBuffer *, int)
+    void balltree_free(BallTree *)
 
-    double balltree_count_radius(BallTree*, Point*, double);
-    double balltree_count_range(BallTree*, Point*, double, double);
-    double balltree_dualcount_radius(BallTree*, BallTree*, double);
+    int balltree_count_nodes(const BallTree *)
+    double balltree_count_radius(const BallTree *, const Point *, double)
+    double balltree_count_range(const BallTree *, const Point *, double, double)
+    double balltree_dualcount_radius(const BallTree *, const BallTree *, double)
+    double balltree_dualcount_range(const BallTree *, const BallTree *, double, double)
+
+    int balltree_to_file(BallTree *, char *)
+    BallTree *balltree_from_file(char *)
 
 
 def BallTree_from_data(
@@ -69,7 +73,7 @@ def BallTree_from_data(
     if size != y.shape[0] or size != z.shape[0] or size != weight.shape[0]:
         raise ValueError("input arrays must have the same length")
 
-    cdef PointBuffer *point_buffer = pointbuffer_create(size)
+    cdef PointBuffer *point_buffer = ptbuf_new(size)
     if point_buffer is NULL:
         raise MemoryError
     for i in range(size):
@@ -82,7 +86,7 @@ def BallTree_from_data(
         tree = balltree_build(point_buffer)
     else:
         tree = balltree_build_leafsize(point_buffer, leafsize)
-    pointbuffer_free(point_buffer)  # data is copied into the tree itself
+    ptbuf_free(point_buffer)  # data is copied into the tree itself
     if tree is NULL:
         raise RuntimeError("failed to allocate or build tree structure")
 
