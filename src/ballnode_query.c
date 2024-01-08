@@ -90,17 +90,6 @@ static double ptslc_dualsumw_in_range_sq(
     return sumw;
 }
 
-int bnode_count_nodes(const BallNode *node) {
-    int count = 1;
-    if (node->left != NULL) {
-        count += bnode_count_nodes(node->left);
-    }
-    if (node->right != NULL) {
-        count += bnode_count_nodes(node->right);
-    }
-    return count;
-}
-
 double bnode_count_radius(
     const BallNode *node,
     const Point *point,
