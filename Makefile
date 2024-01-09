@@ -9,7 +9,7 @@ SRCS = $(wildcard $(SRCDIR)/*.c)
 OBJS = $(patsubst $(SRCDIR)/%.c, $(BUILDDIR)/%.o, $(SRCS))
 
 LIBDIR = lib
-LIBS = $(LIBDIR)/balltree.so
+LIBS = $(LIBDIR)/libballtree.so
 
 TARGET = $(BINDIR)/main.out
 
@@ -28,6 +28,6 @@ $(LIBS): $(OBJS)
 	$(CC) $(LDFLAGS) $^ -o $@
 
 clean:
-	rm -rf $(BUILDDIR)/*.o $(BINDIR)/*
+	rm -rf $(BUILDDIR)/*.o $(BINDIR)/* $(LIBDIR)/*.so
 
 .PHONY: clean
