@@ -8,40 +8,24 @@ The base implementation is in C and there is a wrapper for python in development
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
-#include "point.h"
-#include "balltree.h"
-
-PointBuffer *create_random_points(int num_points) {
-    srand(time(NULL));
-    PointBuffer *buffer = ptbuf_new(num_points);
-    if (buffer == NULL) {
-        return NULL;
-    }
-    for (int i = 0; i < num_points; ++i) {
-        double x = (double)rand() / RAND_MAX;
-        double y = (double)rand() / RAND_MAX;
-        double z = (double)rand() / RAND_MAX;
-        buffer->points[i] = point_create(x, y, z);
-    }
-    return buffer;
-}
+#include "point.h"     // point_create, ptbuf_gen_random
+#include "balltree.h"  // balltree_build, balltree_count_radius
 
 int main(int argc, char** argv) {
-    // build tree from random points in range [1, 0)
-    PointBuffer *buffer = create_random_points(1000000);
-    if (buffer == NULL) {
-        return 1;
-    }
-    BallTree *tree = balltree_build(buffer);
-    if (tree == NULL) {
-        return 1;
-    }
+    // uniform random points in range [-1, 1)
+    int n_data = 1000000;
+    srand(12345);  // seed random generator
+    PointBuffer *points = ptbuf_gen_random(-1.0, 1.0, n_data);
+    if (points == NULL) return 1;
+
+    // build tree from points with default leaf size
+    BallTree *tree = balltree_build(points);
+    if (tree == NULL) return 1;
 
     // query a single point
-    Point query_point = point_create(0.5, 0.5, 0.5);
-    double query_radius = 0.1;
+    Point query_point = point_create(0.0, 0.0, 0.0);
+    double query_radius = 0.2;
     double count = balltree_count_radius(tree, &query_point, query_radius);
     printf("pairs in r <= %.1f: %.0f\n", query_radius, count);
     return 0;
@@ -54,16 +38,18 @@ int main(int argc, char** argv) {
 import numpy as np
 from balltree import BallTree
 
-# build tree from random points in range [1, 0)
+# uniform random points in range [-1, 1)
 n_data = 1_000_000
-x = np.random.uniform(size=n_data)
-y = np.random.uniform(size=n_data)
-z = np.random.uniform(size=n_data)
+x = np.random.uniform(-1.0, 1.0, size=n_data)
+y = np.random.uniform(-1.0, 1.0, size=n_data)
+z = np.random.uniform(-1.0, 1.0, size=n_data)
+
+# build tree from points with default leaf size
 tree = BallTree.from_data(x, y, z)
 
 # query a single point
-query_point = [0.5, 0.5, 0.5]
-query_radius = 0.1
+query_point = [0.0, 0.0, 0.0]
+query_radius = 0.2
 count = tree.count_radius(query_point, query_radius)
 print(f"pairs in r <= {query_radius:.1f}: {count:.0f}")
 ```

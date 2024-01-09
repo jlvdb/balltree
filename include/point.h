@@ -34,6 +34,8 @@ PointBuffer *ptbuf_from_buffers_weighted(int, double *, double *, double *, doub
 void ptbuf_free(PointBuffer *);
 int ptbuf_resize(PointBuffer *, int);
 PointBuffer *ptbuf_copy(const PointBuffer *);
+PointBuffer *ptbuf_gen_random(double, double, int);
+
 PointSlice *ptslc_from_buffer(const PointBuffer *);
 int ptslc_get_size(const PointSlice *);
 

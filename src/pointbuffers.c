@@ -5,6 +5,8 @@
 #include "point.h"
 #include "balltree_macros.h"
 
+static inline double rand_uniform(double low, double high);
+
 PointBuffer *ptbuf_new(int size) {
     if (size < 1) {
         PRINT_ERR_MSG("PointBuffer size must be positive\n");
@@ -99,6 +101,26 @@ PointBuffer *ptbuf_copy(const PointBuffer *buffer) {
     size_t n_bytes = buffer->size * sizeof(Point);
     memcpy(copy->points, buffer->points, n_bytes);
     return copy;
+}
+
+static inline double rand_uniform(double low, double high) {
+    double rand_uniform_normalised = (double)rand() / RAND_MAX;
+    return rand_uniform_normalised * (high - low) + low;
+}
+
+PointBuffer *ptbuf_gen_random(double low, double high, int num_points) {
+    PointBuffer *buffer = ptbuf_new(num_points);
+    if (buffer == NULL) {
+        return NULL;
+    }
+
+    for (int i = 0; i < num_points; ++i) {
+        double x = rand_uniform(low, high);
+        double y = rand_uniform(low, high);
+        double z = rand_uniform(low, high);
+        buffer->points[i] = point_create(x, y, z);
+    }
+    return buffer;
 }
 
 PointSlice *ptslc_from_buffer(const PointBuffer *buffer) {
