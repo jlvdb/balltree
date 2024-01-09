@@ -59,7 +59,7 @@ static PointBuffer *ptbuf_read(int n_items, FILE *file) {
     }
 
     size_t n_read = fread(buffer->points, sizeof(Point), n_items, file);
-    if (n_read != n_items) {
+    if (n_read != (size_t)n_items) {
         ptbuf_free(buffer);
         PRINT_ERR_MSG("failed to read %d data points\n", n_items);
         return NULL;
@@ -109,7 +109,7 @@ static BNodeBuffer *bnodebuffer_read(int n_items, FILE *file) {
     }
 
     size_t n_read = fread(buffer->nodes, sizeof(BallNode), n_items, file);
-    if (n_read != n_items) {
+    if (n_read != (size_t)n_items) {
         PRINT_ERR_MSG("failed to read %d nodes\n", n_items);
         bnodebuffer_free(buffer);
         return NULL;
