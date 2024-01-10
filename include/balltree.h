@@ -4,6 +4,8 @@
 #include "point.h"
 #include "ballnode.h"
 
+#define DEFAULT_LEAFSIZE 20
+
 typedef struct {
     BallNode *root;
     PointBuffer data;
@@ -13,6 +15,7 @@ typedef struct {
 // from balltree.c
 BallTree *balltree_build(const PointBuffer *);
 BallTree *balltree_build_leafsize(const PointBuffer *, int);
+BallTree* balltree_build_nocopy(PointBuffer *, int);
 void balltree_free(BallTree *);
 
 double balltree_count_radius(const BallTree *, const Point *, double);
