@@ -2,7 +2,7 @@ from setuptools import setup, Extension
 import numpy as np
 
 ext_module = Extension(
-    name="pyballtree",
+    name="balltree",
     sources=[
         "python/balltree_wrapper.c",
         "src/point.c",
@@ -23,7 +23,7 @@ ext_module = Extension(
 )
 
 setup(
-    name="pyballtree",
+    name="balltree",
     author="Jan Luca van den Busch",
     version="0.1.0",
     description="Python wrapper for C BallTree",
