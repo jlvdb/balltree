@@ -40,9 +40,10 @@ from balltree import BallTree
 
 # uniform random points in range [-1, 1)
 n_data = 1_000_000
-x = np.random.uniform(-1.0, 1.0, size=n_data)
-y = np.random.uniform(-1.0, 1.0, size=n_data)
-z = np.random.uniform(-1.0, 1.0, size=n_data)
+rng = np.random.default_rng(12345)
+x = rng.uniform(-1.0, 1.0, size=n_data)
+y = rng.uniform(-1.0, 1.0, size=n_data)
+z = rng.uniform(-1.0, 1.0, size=n_data)
 
 # build tree from points with default leaf size
 tree = BallTree(x, y, z)
