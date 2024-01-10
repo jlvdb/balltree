@@ -5,6 +5,8 @@
 
 #include "point.h"
 #include "balltree.h"
+#define SET_PYERR_STRING
+#include "balltree_macros.h"
 
 struct PyBallTree;
 
