@@ -45,7 +45,7 @@ y = np.random.uniform(-1.0, 1.0, size=n_data)
 z = np.random.uniform(-1.0, 1.0, size=n_data)
 
 # build tree from points with default leaf size
-tree = BallTree.from_data(x, y, z)
+tree = BallTree(x, y, z)
 
 # query a single point
 query_point = [0.0, 0.0, 0.0]

@@ -22,10 +22,8 @@ ext_module = Extension(
     ],
 )
 
-setup(
-    name="balltree",
-    author="Jan Luca van den Busch",
-    version="0.1.0",
-    description="Python wrapper for C BallTree",
-    ext_modules=[ext_module],
-)
+if __name__ == "__main__":
+    setup(
+        ext_modules=[ext_module],
+        url="https://github.com/jlvdb/balltree.git",
+    )
