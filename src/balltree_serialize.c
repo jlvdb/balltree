@@ -70,6 +70,7 @@ static PointBuffer *ptbuf_read(int n_items, FILE *file) {
 static BNodeBuffer *bnodebuffer_new(int size) {
     BNodeBuffer *nodebuffer = (BNodeBuffer *)malloc(sizeof(BNodeBuffer));
     if (nodebuffer == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate BNodeBuffer");
         return NULL;
     }
 
@@ -77,6 +78,8 @@ static BNodeBuffer *bnodebuffer_new(int size) {
     nodebuffer->next_free = 0;
     nodebuffer->nodes = (BallNode *)malloc(size * sizeof(BallNode));
     if (nodebuffer->nodes == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate BNodeBuffer buffer");
+        bnodebuffer_free(nodebuffer);
         return NULL;
     }
     return nodebuffer;
@@ -120,6 +123,7 @@ static BNodeBuffer *bnodebuffer_read(int n_items, FILE *file) {
 static FileHeader *fileheader_new(const BallTree *tree) {
     FileHeader *header = (FileHeader *)malloc(sizeof(FileHeader));
     if (header == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate FileHeader");
         return NULL;
     }
 
@@ -148,6 +152,7 @@ static int fileheader_write(const FileHeader *header, FILE *file) {
 static FileHeader *fileheader_read(FILE *file) {
     FileHeader *header = (FileHeader *)malloc(sizeof(FileHeader));
     if (header == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate FileHeader");
         return NULL;
     }
 
@@ -261,6 +266,7 @@ static BallNode *bnode_deserialise(
     // create a new node instance
     BallNode *node = (BallNode *)malloc(sizeof(BallNode));
     if (node == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate BallNode");
         return NULL;
     }
     *node = *stored;
@@ -290,6 +296,7 @@ static BallNode *bnode_deserialise(
 BallTree* balltree_from_file(const char *path) {
     BallTree *tree = (BallTree *)malloc(sizeof(BallTree));
     if (tree == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate BallTree");
         return NULL;
     }
 
