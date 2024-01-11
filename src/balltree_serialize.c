@@ -46,7 +46,7 @@ static int ptbuf_write(const PointBuffer *buffer, FILE *file) {
     size_t n_items = (size_t)buffer->size;
     size_t n_written = fwrite(buffer->points, sizeof(Point), n_items, file);
     if (n_written != n_items) {
-        PRINT_ERR_MSG("failed to write %zu data points\n", n_items);
+        EMIT_ERR_MSG(IOError, "failed to write %zu data points", n_items);
         return BTR_FAILED;
     }
     return BTR_SUCCESS;
@@ -61,7 +61,7 @@ static PointBuffer *ptbuf_read(int n_items, FILE *file) {
     size_t n_read = fread(buffer->points, sizeof(Point), n_items, file);
     if (n_read != (size_t)n_items) {
         ptbuf_free(buffer);
-        PRINT_ERR_MSG("failed to read %d data points\n", n_items);
+        EMIT_ERR_MSG(IOError, "failed to read %d data points", n_items);
         return NULL;
     }
     return buffer;
@@ -70,6 +70,7 @@ static PointBuffer *ptbuf_read(int n_items, FILE *file) {
 static BNodeBuffer *bnodebuffer_new(int size) {
     BNodeBuffer *nodebuffer = (BNodeBuffer *)malloc(sizeof(BNodeBuffer));
     if (nodebuffer == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate BNodeBuffer");
         return NULL;
     }
 
@@ -77,6 +78,8 @@ static BNodeBuffer *bnodebuffer_new(int size) {
     nodebuffer->next_free = 0;
     nodebuffer->nodes = (BallNode *)malloc(size * sizeof(BallNode));
     if (nodebuffer->nodes == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate BNodeBuffer buffer");
+        bnodebuffer_free(nodebuffer);
         return NULL;
     }
     return nodebuffer;
@@ -96,7 +99,7 @@ static int bnodebuffer_write(const BNodeBuffer *buffer, FILE *file) {
     size_t n_items = (size_t)buffer->size;
     size_t n_written = fwrite(buffer->nodes, sizeof(BallNode), n_items, file);
     if (n_written != n_items) {
-        PRINT_ERR_MSG("failed to write %zu nodes\n", n_items);
+        EMIT_ERR_MSG(IOError, "failed to write %zu nodes", n_items);
         return BTR_FAILED;
     }
     return BTR_SUCCESS;
@@ -110,7 +113,7 @@ static BNodeBuffer *bnodebuffer_read(int n_items, FILE *file) {
 
     size_t n_read = fread(buffer->nodes, sizeof(BallNode), n_items, file);
     if (n_read != (size_t)n_items) {
-        PRINT_ERR_MSG("failed to read %d nodes\n", n_items);
+        EMIT_ERR_MSG(IOError, "failed to read %d nodes", n_items);
         bnodebuffer_free(buffer);
         return NULL;
     }
@@ -120,6 +123,7 @@ static BNodeBuffer *bnodebuffer_read(int n_items, FILE *file) {
 static FileHeader *fileheader_new(const BallTree *tree) {
     FileHeader *header = (FileHeader *)malloc(sizeof(FileHeader));
     if (header == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate FileHeader");
         return NULL;
     }
 
@@ -139,7 +143,7 @@ static int fileheader_write(const FileHeader *header, FILE *file) {
     const size_t n_items = 1;
     size_t n_written = fwrite(header, sizeof(*header), n_items, file);
     if (n_written != n_items) {
-        PRINT_ERR_MSG("failed to write file header\n");
+        EMIT_ERR_MSG(IOError, "failed to write file header");
         return BTR_FAILED;
     }
     return BTR_SUCCESS;
@@ -148,13 +152,14 @@ static int fileheader_write(const FileHeader *header, FILE *file) {
 static FileHeader *fileheader_read(FILE *file) {
     FileHeader *header = (FileHeader *)malloc(sizeof(FileHeader));
     if (header == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate FileHeader");
         return NULL;
     }
 
     const size_t n_items = 1;
     size_t n_read = fread(header, sizeof(FileHeader), n_items, file);
     if (n_read != n_items) {
-        PRINT_ERR_MSG("failed to read file header\n");
+        EMIT_ERR_MSG(IOError, "failed to read file header");
         return NULL;
     }
     return header;
@@ -166,7 +171,7 @@ static inline intptr_t child_ptr_substitute(const BallNode *child, BNodeBuffer *
 
 static int bnode_serialise(const BallNode *node, BNodeBuffer *buffer, int buf_idx) {
     if (buffer->next_free > buffer->size) {
-        PRINT_ERR_MSG("buffer is too small to store further nodes");
+        EMIT_ERR_MSG(IndexError, "buffer is too small to store further nodes");
         return BTR_FAILED;
     }
 
@@ -198,7 +203,7 @@ static int bnode_serialise(const BallNode *node, BNodeBuffer *buffer, int buf_id
 int balltree_to_file(const BallTree *tree, const char *path) {
     FILE *file = fopen(path, "wb");
     if (file == NULL) {
-        PRINT_ERR_MSG("failed to open file: %s\n", path);
+        EMIT_ERR_MSG(OSError, "failed to open file: %s", path);
         return BTR_FAILED;
     }
 
@@ -234,7 +239,7 @@ int balltree_to_file(const BallTree *tree, const char *path) {
 
     bnodebuffer_free(nodebuffer);
     if (fflush(file) == EOF) {
-        PRINT_ERR_MSG("failed to flush file\n");
+        EMIT_ERR_MSG(IOError, "failed to flush file");
         goto err_close_file;
     }
     fclose(file);
@@ -253,7 +258,7 @@ static BallNode *bnode_deserialise(
     int buf_idx
 ) {
     if (buf_idx >= buffer->size) {
-        PRINT_ERR_MSG("node index exceeds node buffer size\n");
+        EMIT_ERR_MSG(IndexError, "node index exceeds node buffer size");
         return NULL;
     }
     BallNode *stored = buffer->nodes + buf_idx;
@@ -261,6 +266,7 @@ static BallNode *bnode_deserialise(
     // create a new node instance
     BallNode *node = (BallNode *)malloc(sizeof(BallNode));
     if (node == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate BallNode");
         return NULL;
     }
     *node = *stored;
@@ -290,12 +296,13 @@ static BallNode *bnode_deserialise(
 BallTree* balltree_from_file(const char *path) {
     BallTree *tree = (BallTree *)malloc(sizeof(BallTree));
     if (tree == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate BallTree");
         return NULL;
     }
 
     FILE *file = fopen(path, "rb");
     if (file == NULL) {
-        PRINT_ERR_MSG("failed to open file: %s\n", path);
+        EMIT_ERR_MSG(OSError, "failed to open file: %s", path);
         goto err_dealloc_tree;
     }
 

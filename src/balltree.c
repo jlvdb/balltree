@@ -6,11 +6,11 @@
 #include "balltree.h"
 #include "balltree_macros.h"
 
-BallTree* balltree_build(const PointBuffer *buffer) {
+BallTree *balltree_build(const PointBuffer *buffer) {
     return balltree_build_leafsize(buffer, DEFAULT_LEAFSIZE);
 }
 
-BallTree* balltree_build_leafsize(const PointBuffer *buffer, int leafsize) {
+BallTree *balltree_build_leafsize(const PointBuffer *buffer, int leafsize) {
     PointBuffer *data = ptbuf_copy(buffer);
     if (data == NULL) {
         return NULL;
@@ -18,16 +18,16 @@ BallTree* balltree_build_leafsize(const PointBuffer *buffer, int leafsize) {
     return balltree_build_nocopy(data, leafsize);
 }
 
-BallTree* balltree_build_nocopy(PointBuffer *buffer, int leafsize) {
+BallTree *balltree_build_nocopy(PointBuffer *buffer, int leafsize) {
     int size = buffer->size;
     if (size < 1) {
-        PRINT_ERR_MSG("need at least one input data point to build a tree\n");
+        EMIT_ERR_MSG(ValueError, "need at least one input data point to build a tree");
         return NULL;
     }
 
     BallTree *tree = (BallTree*)malloc(sizeof(BallTree));
     if (tree == NULL) {
-        PRINT_ERR_MSG("BallTree root allocation failed\n");
+        EMIT_ERR_MSG(MemoryError, "BallTree root allocation failed");
         return NULL;
     }
     tree->leafsize = leafsize;

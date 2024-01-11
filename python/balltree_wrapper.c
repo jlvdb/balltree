@@ -5,13 +5,18 @@
 
 #include "point.h"
 #include "balltree.h"
+#include "balltree_macros.h"
 
 struct PyBallTree;
 
+// helper functions
 static const char *PyString_to_char(PyObject* py_string);
 static Point *PyIter_to_point(PyObject *point_iter, double weight);
-static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer);
+static NpyIter *numpy_iter_point_arrays(PyArrayObject *x_obj, PyArrayObject *y_obj, PyArrayObject *z_obj, PyArrayObject *weight_obj);
+static npy_intp check_arrays_dtype_shape(PyObject *x_obj, PyObject *y_obj, PyObject *z_obj, PyObject *weight_obj);
+static PyObject *numpy_ones_1dim(npy_intp size);
 static PointBuffer *ptbuf_from_numpy_array(PyArrayObject *x_obj, PyArrayObject *y_obj, PyArrayObject *z_obj, PyArrayObject *weight_obj);
+static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer);
 static PyObject *statvec_get_numpy_array(StatsVector *vec);
 
 // PyBallTree: constructors & deallocators
@@ -28,7 +33,7 @@ static PyObject *pyballtree_get_sum_weight(PyObject *self, void *closure);
 static PyObject *pyballtree_get_center(PyObject *self, void *closure);
 static PyObject *pyballtree_get_radius(PyObject *self, void *closure);
 // PyBallTree: method implementations
-static PyObject* pyballtree_str(PyObject *self);
+static PyObject *pyballtree_str(PyObject *self);
 static PyObject *PyBallTree_to_file(PyObject *self, PyObject *args);
 static PyObject *PyBallTree_count_nodes(PyObject *self);
 static PyObject *PyBallTree_get_node_data(PyObject *self);
@@ -54,40 +59,132 @@ static const char *PyString_to_char(PyObject* py_string) {
     return string;
 }
 
-static Point *PyIter_to_point(PyObject *point_iter, double weight) {
-    // Convert the iterable to a fast sequence object
-    PyObject *point_sequence = PySequence_Fast(
-        point_iter,
-        "expected a sequence with length 3"
-    );
-    if (point_sequence == NULL) {
-        return NULL;
+static Point *PyIter_to_point(PyObject *coord_iter, double weight) {
+    // check the input to be an iterator with size 3
+    const char err_msg[] = "expected a sequence with length 3";
+    PyObject *coord_seq = PySequence_Fast(coord_iter, err_msg);
+    if (coord_seq == NULL) {
+        goto fail;
     }
-
-    Py_ssize_t seq_length = PySequence_Fast_GET_SIZE(point_sequence);
+    Py_ssize_t seq_length = PySequence_Fast_GET_SIZE(coord_seq);
     if (seq_length != 3) {
-        PyErr_SetString(PyExc_ValueError, "iterable must have length 3");
-        Py_DECREF(point_sequence);
-        return NULL;
+        PyErr_SetString(PyExc_ValueError, err_msg);
+        goto fail;
     }
 
-    // create the point instance
+    // create the point instance from the python sequence
     Point *point = (Point *)malloc(sizeof(Point));
     if (point == NULL) {
-        return NULL;
+        PyErr_SetString(PyExc_MemoryError, "failed to allocate Point");
+        goto fail;
     }
-    point->x = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(point_sequence, 0));
-    point->y = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(point_sequence, 1));
-    point->z = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(point_sequence, 2));
-    if (PyErr_Occurred()) {
-        PyErr_SetString(PyExc_ValueError, "invalid float values in the iterable");
-        Py_DECREF(point_sequence);
-        return NULL;
-    }
+    point->x = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(coord_seq, 0));
+    point->y = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(coord_seq, 1));
+    point->z = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(coord_seq, 2));
     point->weight = weight;
+    Py_DECREF(coord_seq);
+    if (PyErr_Occurred()) {
+        PyErr_SetString(PyExc_ValueError, "cannot convert coordinates to float");
+        return NULL;
+    }
 
-    Py_DECREF(point_sequence);
     return point;
+
+fail:
+    Py_DECREF(coord_seq);
+    return NULL;
+}
+
+static NpyIter *numpy_iter_point_arrays(
+    PyArrayObject *x_obj,
+    PyArrayObject *y_obj,
+    PyArrayObject *z_obj,
+    PyArrayObject *weight_obj
+) {
+    const int n_arrays = 4;
+    PyArrayObject *arrays[n_arrays] = {x_obj, y_obj, z_obj, weight_obj};
+    npy_uint32 array_flags[n_arrays] = {
+        NPY_ITER_READONLY,
+        NPY_ITER_READONLY,
+        NPY_ITER_READONLY,
+        NPY_ITER_READONLY,
+    };
+    NpyIter *iter = NpyIter_MultiNew(
+        n_arrays,
+        arrays,
+        NPY_ITER_EXTERNAL_LOOP,
+        NPY_KEEPORDER,
+        NPY_SAFE_CASTING,
+        array_flags,
+        NULL
+    );
+    if (iter == NULL) {
+        PyErr_SetString(PyExc_IndexError, "failed to create interator for input arrays");
+        return NULL;
+    }
+    return iter;
+}
+
+static npy_intp check_arrays_dtype_shape(
+    PyObject *x_obj,
+    PyObject *y_obj,
+    PyObject *z_obj,
+    PyObject *weight_obj
+) {
+    // check if all inputs are arrays
+    int weights_provided = weight_obj != Py_None;
+    if (PyArray_Check(x_obj) == 0) {
+        PyErr_SetString(PyExc_TypeError, "'x' must be a numpy array");
+        return -1;
+    }
+    if (PyArray_Check(y_obj) == 0) {
+        PyErr_SetString(PyExc_TypeError, "'y' must be a numpy array");
+        return -1;
+    }
+    if (PyArray_Check(z_obj) == 0) {
+        PyErr_SetString(PyExc_TypeError, "'z' must be a numpy array");
+        return -1;
+    }
+    if (weights_provided && PyArray_Check(weight_obj) == 0) {
+        PyErr_SetString(PyExc_TypeError, "'weight' must be a numpy array or None");
+        return -1;
+    }
+
+    // check input array dimensions
+    if (PyArray_NDIM(x_obj) != 1 ||
+        PyArray_NDIM(y_obj) != 1 ||
+        PyArray_NDIM(z_obj) != 1 ||
+        (weights_provided && PyArray_NDIM(weight_obj) != 1)
+    ) {
+        PyErr_SetString(PyExc_ValueError, "all arrays must be one-dimensional");
+        return -1;
+    }
+    npy_intp size = PyArray_DIM(x_obj, 0);
+    if (PyArray_DIM(y_obj, 0) != size ||
+        PyArray_DIM(z_obj, 0) != size ||
+        (weights_provided && PyArray_DIM(weight_obj, 0) != size)
+    ) {
+        PyErr_SetString(PyExc_ValueError, "all arrays must have the same shape");
+        return -1;
+    }
+
+    return size;
+}
+
+static PyObject *numpy_ones_1dim(npy_intp size) {
+    const npy_intp ndim = 1;
+    npy_intp shape[ndim] = {size};
+    PyObject *array = PyArray_EMPTY(ndim, shape, NPY_DOUBLE, 0);
+    if (array == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "failed to allocate array");
+        return NULL;
+    }
+
+    npy_double *buffer = PyArray_DATA(array);
+    for (npy_intp i = 0; i < size; ++i) {
+        buffer[i] = 1.0;
+    }
+    return array;
 }
 
 static PointBuffer *ptbuf_from_numpy_array(
@@ -96,83 +193,70 @@ static PointBuffer *ptbuf_from_numpy_array(
     PyArrayObject *z_obj,
     PyArrayObject *weight_obj
 ) {
-    // set up iterator to iterate input arrays simultaneously
-    const int nop = 4;
-    PyArrayObject *op[nop] = {x_obj, y_obj, z_obj, weight_obj};
-    npy_uint32 op_flags[nop] = {
-        NPY_ITER_READONLY,
-        NPY_ITER_READONLY,
-        NPY_ITER_READONLY,
-        NPY_ITER_READONLY,
-    };
-    NpyIter *iter = NpyIter_MultiNew(
-        nop,
-        op,
-        NPY_ITER_EXTERNAL_LOOP,
-        NPY_KEEPORDER,
-        NPY_SAFE_CASTING,
-        op_flags,
-        NULL
-    );
-    if (iter == NULL) {
+    NpyIter *multi_iter = numpy_iter_point_arrays(x_obj, y_obj, z_obj, weight_obj);
+    if (multi_iter == NULL) {
         return NULL;
     }
 
-    // set up output buffer
-    int size = NpyIter_GetIterSize(iter);
+    // set up the output buffer
+    int size = NpyIter_GetIterSize(multi_iter);
     PointBuffer *buffer = ptbuf_new(size);
     if (buffer == NULL) {
+        NpyIter_Deallocate(multi_iter);
         return NULL;
     }
     Point *points = buffer->points;
 
-    // set up pointers for iteration
-    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
+    // set up pointers for iteration, no require any defereferencing
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(multi_iter, NULL);
     if (iternext == NULL) {
-        NpyIter_Deallocate(iter);
+        PyErr_SetString(PyExc_ValueError, "failed to create iterator for input arrays");
+        NpyIter_Deallocate(multi_iter);
         ptbuf_free(buffer);
         return NULL;
     }
-    char **dataptr = NpyIter_GetDataPtrArray(iter);
-    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
-    npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(iter);
+    char **dataptr = NpyIter_GetDataPtrArray(multi_iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(multi_iter);
+    npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(multi_iter);
 
-    int i = 0;
-    do {
+    // iterate and interpret values as doubles and copy values into PointBuffer
+    int idx_ptbuf = 0;
+    do {  // the outer loop should be just a single iteration
         char *ptr_x = dataptr[0];
         char *ptr_y = dataptr[1];
         char *ptr_z = dataptr[2];
         char *ptr_weight = dataptr[3];
-
         npy_intp stride_x = strideptr[0];
         npy_intp stride_y = strideptr[1];
         npy_intp stride_z = strideptr[2];
         npy_intp stride_weight = strideptr[3];
-        npy_intp count = *innersizeptr;
 
+        // run inner loop of all elements
+        npy_intp count = *innersizeptr;
         while (count--) {
-            points[i] = point_create_weighted(
+            points[idx_ptbuf] = point_create_weighted(
                 *(double *)ptr_x,
                 *(double *)ptr_y,
                 *(double *)ptr_z,
                 *(double *)ptr_weight
             );
-
+            ++idx_ptbuf;
+            // move the iterator corresponding to the data size
             ptr_x += stride_x;
             ptr_y += stride_y;
             ptr_z += stride_z;
             ptr_weight += stride_weight;
 
-            ++i;
         }
-    } while (iternext(iter));
+    } while (iternext(multi_iter));
 
-    NpyIter_Deallocate(iter);
+    NpyIter_Deallocate(multi_iter);
     return buffer;
 }
 
 static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
-    npy_intp dims[1] = {buffer->size};
+    const npy_intp ndim = 1;
+    npy_intp shape[ndim] = {buffer->size};
 
     // construct an appropriate dtype for Point
     PyObject *arr_dtype = Py_BuildValue(
@@ -182,21 +266,25 @@ static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
         "z", "f8",
         "weight", "f8"
     );
-    if (arr_dtype == NULL)
+    if (arr_dtype == NULL) {
         return NULL;
+    
+}
+    // get the numpy API array descriptor
+    PyArray_Descr *arr_descr;
+    int result = PyArray_DescrConverter(arr_dtype, &arr_descr);  // PyArray_Descr **
+    Py_DECREF(arr_dtype);
+    if (result != NPY_SUCCEED) {
+        return NULL;
+    }
 
     // get an array view
-    PyArray_Descr *arr_descr;
-    int result = PyArray_DescrConverter(arr_dtype, &arr_descr);
-    Py_DECREF(arr_dtype);
-    if (result != NPY_SUCCEED)
-        return NULL;
     return PyArray_NewFromDescr(
         &PyArray_Type,
-        arr_descr,
-        1,     // no. of dimensions
-        dims,  // shape
-        NULL,  // strides
+        arr_descr,  // reference stolen, no Py_DECREF needed
+        ndim,
+        shape,
+        NULL,
         buffer->points,
         NPY_ARRAY_CARRAY,
         NULL
@@ -204,7 +292,10 @@ static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
 }
 
 static PyObject *statvec_get_numpy_array(StatsVector *vec) {
-    // construct an appropriate dtype for Point
+    const npy_intp ndim = 1;
+    npy_intp shape[ndim] = {vec->end};
+
+    // construct an appropriate dtype for StatsVector
     PyObject *arr_dtype = Py_BuildValue(
         "[(ss)(ss)(ss)(ss)(ss)(ss)(ss)]",
         "depth", "i4",
@@ -215,22 +306,24 @@ static PyObject *statvec_get_numpy_array(StatsVector *vec) {
         "z", "f8",
         "radius", "f8"
     );
-    if (arr_dtype == NULL)
-        return NULL;
-
-    // create a NumPy array containg a copy of the data
-    npy_intp dims[1] = {vec->end};
-    PyArray_Descr *arr_descr;
-    int result = PyArray_DescrConverter(arr_dtype, &arr_descr);
-    Py_DECREF(arr_dtype);
-    if (result != NPY_SUCCEED)
-        return NULL;
-    
-    PyObject *array = PyArray_Empty(1, dims, arr_descr, 0);
-    if (array == NULL) {
+    if (arr_dtype == NULL) {
         return NULL;
     }
 
+    // get the numpy API array descriptor
+    PyArray_Descr *arr_descr;
+    int result = PyArray_DescrConverter(arr_dtype, &arr_descr);  // PyArray_Descr **
+    Py_DECREF(arr_dtype);
+    if (result != NPY_SUCCEED) {
+        return NULL;
+    }
+
+    // create an uninitialised array and copy the data into it
+    PyObject *array = PyArray_Empty(ndim, shape, arr_descr, 0);
+    Py_DECREF(arr_descr);
+    if (array == NULL) {
+        return NULL;
+    }
     void *ptr = PyArray_DATA(array);
     memcpy(ptr, vec->stats, sizeof(NodeStats) * vec->end);
     return array;
@@ -368,61 +461,30 @@ static PyTypeObject PyBallTreeType = {
 static PyObject *PyBallTree_from_data(
     PyTypeObject *type,
     PyObject *args,
-    PyObject *kwds
+    PyObject *kwargs
 ) {
-    // todo: leafsize
+    static char *kwlist[] = {"x", "y", "z", "weight", "leafsize", NULL};
     PyObject *x_obj, *y_obj, *z_obj, *weight_obj = Py_None;
     int leafsize = DEFAULT_LEAFSIZE;
-    static char *kwlist[] = {"x", "y", "z", "weight", "leafsize", NULL};
     if (!PyArg_ParseTupleAndKeywords(
-            args, kwds, "OOO|Oi", kwlist,
+            args, kwargs, "OOO|Oi", kwlist,
             &x_obj, &y_obj, &z_obj, &weight_obj, &leafsize)
     ) {
         return NULL;
     }
     int weights_provided = weight_obj != Py_None;
 
-    // check if all inputs are arrays
-    if (PyArray_Check(x_obj) == 0) {
-        PyErr_SetString(PyExc_TypeError, "'x' must be a numpy array");
+    // check the input data and create a numpy array with ones if weight is None
+    npy_intp size = check_arrays_dtype_shape(x_obj, y_obj, z_obj, weight_obj);
+    if (size == -1) {
         return NULL;
     }
-    if (PyArray_Check(y_obj) == 0) {
-        PyErr_SetString(PyExc_TypeError, "'y' must be a numpy array");
+    if (size == 0) {
+        PyErr_SetString(PyExc_ValueError, "need at least one data point");
         return NULL;
     }
-    if (PyArray_Check(z_obj) == 0) {
-        PyErr_SetString(PyExc_TypeError, "'z' must be a numpy array");
-        return NULL;
-    }
-    if (weight_obj != Py_None && PyArray_Check(weight_obj) == 0) {
-        PyErr_SetString(PyExc_TypeError, "'weight' must be a numpy array or None");
-        return NULL;
-    }
-
-    // check input array dimensions
-    if (
-        PyArray_NDIM(x_obj) != 1 ||
-        PyArray_NDIM(y_obj) != 1 ||
-        PyArray_NDIM(z_obj) != 1 ||
-        (weights_provided && PyArray_NDIM(weight_obj) != 1)
-    ) {
-        PyErr_SetString(PyExc_ValueError, "all arrays must be one-dimensional");
-        return NULL;
-    }
-
-    // create a numpy array with ones if weight is None
-    npy_intp shape[1] = {PyArray_DIM(x_obj, 0)};
     if (!weights_provided) {
-        weight_obj = PyArray_EMPTY(1, shape, NPY_DOUBLE, 0);
-        if (!weight_obj) {
-            return NULL;
-        }
-        // Fill the array with ones
-        npy_double *weight_data = PyArray_DATA(weight_obj);
-        for (npy_intp i = 0; i < shape[0]; ++i) {
-            weight_data[i] = 1.0;
-        }
+        weight_obj = numpy_ones_1dim(size);
     }
 
     PointBuffer *buffer = ptbuf_from_numpy_array(
@@ -431,19 +493,21 @@ static PyObject *PyBallTree_from_data(
         (PyArrayObject *)z_obj,
         (PyArrayObject *)weight_obj
     );
+    if (!weights_provided) {
+        Py_DECREF(&weight_obj);
+    }
     if (buffer == NULL) {
         return NULL;
     }
 
-    // create the object
-    PyBallTree *self;
-    self = (PyBallTree *)type->tp_alloc(type, 0);
+    // build the balltree
+    BallTree *tree = balltree_build_nocopy(buffer, leafsize);  // buffer owner
+    if (tree == NULL) {
+        return NULL;
+    }
+    PyBallTree *self = (PyBallTree *)type->tp_alloc(type, 0);
     if (self != NULL) {
-        self->balltree = balltree_build_nocopy(buffer, leafsize);
-        if (self->balltree == NULL) {
-            Py_DECREF(self);
-            return NULL;
-        }
+        self->balltree = tree;
     }
     return (PyObject *)self;
 }
@@ -451,16 +515,14 @@ static PyObject *PyBallTree_from_data(
 static PyObject *PyBallTree_from_random(
     PyTypeObject *type,
     PyObject *args,
-    PyObject *kwds
+    PyObject *kwargs
 ) {
-    // parse the python arguments
+    static char *kwlist[] = {"low", "high", "size", "leafsize", NULL};
     double low, high;
     int size;
     int leafsize = DEFAULT_LEAFSIZE;
-
-    static char *kwlist[] = {"low", "high", "size", "leafsize", NULL};
     if (!PyArg_ParseTupleAndKeywords(
-            args, kwds, "ddi|i", kwlist,
+            args, kwargs, "ddi|i", kwlist,
             &low, &high, &size, &leafsize)
     ) {
         return NULL;
@@ -473,52 +535,41 @@ static PyObject *PyBallTree_from_random(
     }
 
     // build the balltree
-    BallTree *tree;
-    tree = balltree_build_leafsize(buffer, leafsize);
+    BallTree *tree = balltree_build_leafsize(buffer, leafsize);
     if (tree == NULL) {
         return NULL;
     }
     ptbuf_free(buffer);  // buffer is copied into tree
-
-    // create the object
-    PyBallTree *self;
-    self = (PyBallTree *)type->tp_alloc(type, 0);
+    PyBallTree *self = (PyBallTree *)type->tp_alloc(type, 0);
     if (self != NULL) {
         self->balltree = tree;
-        if (self->balltree == NULL) {
-            Py_DECREF(self);
-            return NULL;
-        }
     }
     return (PyObject *)self;
 }
 
 static PyObject *PyBallTree_from_file(PyTypeObject *type, PyObject *args) {
-    // Parse arguments
     PyObject *py_string;
-    if (!PyArg_ParseTuple(args, "O", &py_string)) {
+    if (!PyArg_ParseTuple(args, "O!", &PyUnicode_Type, &py_string)) {
         return NULL;
     }
-    const char *path = PyString_to_char(py_string);
+    const char *path = PyString_to_char(py_string);  // buffer is managed by py_string
     if (path == NULL) {
         return NULL;
     }
-
-    // create the object
-    PyBallTree *self;
-    self = (PyBallTree *)type->tp_alloc(type, 0);
+    // build the balltree
+    BallTree *tree = balltree_from_file(path);
+    if (tree == NULL) {
+        return NULL;
+    }
+    PyBallTree *self = (PyBallTree *)type->tp_alloc(type, 0);
     if (self != NULL) {
-        self->balltree = balltree_from_file(path);
-        if (self->balltree == NULL) {
-            Py_DECREF(self);
-            return NULL;
-        }
+        self->balltree = tree;
     }
     return (PyObject *)self;
 }
 
-static PyObject *pyballtree_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
-    return PyBallTree_from_data(type, args, kwds);
+static PyObject *pyballtree_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+    return PyBallTree_from_data(type, args, kwargs);
 }
 
 static void pyballtree_dealloc(PyObject *self) {
@@ -568,7 +619,7 @@ static PyObject *pyballtree_get_radius(PyObject *self, void *closure) {
 
 // PyBallTree: method implementations //////////////////////////////////////////
 
-static PyObject* pyballtree_str(PyObject *self) {
+static PyObject *pyballtree_str(PyObject *self) {
     PyBallTree *pytree = (PyBallTree *)self;
     BallTree *tree = pytree->balltree;
     BallNode *node = tree->root;
@@ -586,33 +637,33 @@ static PyObject* pyballtree_str(PyObject *self) {
         node->center.z
     );
     if (n_bytes < 0 || n_bytes >= (int)sizeof(buffer)) {
-        PyErr_SetString(PyExc_RuntimeError, "failed to format the string.");
+        PyErr_SetString(PyExc_RuntimeError, "failed to format the string");
         return NULL;
     }
 
     // convert to python str
     PyObject *py_string = PyUnicode_DecodeUTF8(buffer, n_bytes, "strict");
-    if (!py_string) {
-        PyErr_SetString(PyExc_RuntimeError, "failed to convert the string to Python.");
+    if (py_string == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "failed to convert to python unicode");
         return NULL;
     }
     return py_string;
 }
 
 static PyObject *PyBallTree_to_file(PyObject *self, PyObject *args) {
-    PyBallTree *pytree = (PyBallTree *)self;
-
-    // Parse arguments
     PyObject *py_string;
-    if (!PyArg_ParseTuple(args, "O", &py_string)) {
+    if (!PyArg_ParseTuple(args, "O!", &PyUnicode_Type, &py_string)) {
         return NULL;
     }
-    const char *path = PyString_to_char(py_string);
+    const char *path = PyString_to_char(py_string);  // buffer is managed by py_string
     if (path == NULL) {
         return NULL;
     }
 
-    balltree_to_file(pytree->balltree, path);
+    PyBallTree *pytree = (PyBallTree *)self;
+    if (balltree_to_file(pytree->balltree, path) == BTR_FAILED) {
+        return NULL;
+    }
     Py_RETURN_NONE;
 }
 
@@ -628,6 +679,7 @@ static PyObject *PyBallTree_get_node_data(PyObject *self) {
     if (vec == NULL) {
         return NULL;
     }
+
     PyObject *array = statvec_get_numpy_array(vec);
     statvec_free(vec);
     return array;
@@ -638,13 +690,10 @@ static PyObject *PyBallTree_count_radius(
     PyObject *args,
     PyObject *kwargs
 ) {
-    PyBallTree *pytree = (PyBallTree *)self;
-
-    // Parse the Python arguments
-    PyObject *coord_iter;
+    static char *kwlist[] = {"point", "radius", "weight", NULL};
+    PyObject *coord_iter;  // TODO: refcount?
     double radius;
     double weight = 1.0;  // weight is optional
-    static char *kwlist[] = {"point", "radius", "weight", NULL};
     if (!PyArg_ParseTupleAndKeywords(
             args, kwargs, "Od|d", kwlist,
             &coord_iter, &radius, &weight)
@@ -656,6 +705,7 @@ static PyObject *PyBallTree_count_radius(
         return NULL;
     }
 
+    PyBallTree *pytree = (PyBallTree *)self;
     double count = balltree_count_radius(pytree->balltree, point, radius);
     free(point);
     return PyFloat_FromDouble(count);
@@ -666,13 +716,10 @@ static PyObject *PyBallTree_count_range(
     PyObject *args,
     PyObject *kwargs
 ) {
-    PyBallTree *pytree = (PyBallTree *)self;
-
-    // Parse the Python arguments
-    PyObject *coord_iter;
+    static char *kwlist[] = {"point", "rmin", "rmax", "weight", NULL};
+    PyObject *coord_iter;  // TODO: refcount?
     double rmin, rmax;
     double weight = 1.0;  // weight is optional
-    static char *kwlist[] = {"point", "rmin", "rmax", "weight", NULL};
     if (!PyArg_ParseTupleAndKeywords(
             args, kwargs, "Odd|d", kwlist,
             &coord_iter, &rmin, &rmax, &weight)
@@ -684,21 +731,20 @@ static PyObject *PyBallTree_count_range(
         return NULL;
     }
 
+    PyBallTree *pytree = (PyBallTree *)self;
     double count = balltree_count_range(pytree->balltree, point, rmin, rmax);
     free(point);
     return PyFloat_FromDouble(count);
 }
 
 static PyObject *PyBallTree_dualcount_radius(PyObject *self, PyObject *args) {
-    PyBallTree *pytree = (PyBallTree *)self;
-
-    // Parse the Python arguments
     PyBallTree *other_tree;
     double radius;
     if (!PyArg_ParseTuple(args, "O!d", &PyBallTreeType, &other_tree, &radius)) {
         return NULL;
     }
 
+    PyBallTree *pytree = (PyBallTree *)self;
     double count = balltree_dualcount_radius(
         pytree->balltree,
         other_tree->balltree,
@@ -708,15 +754,13 @@ static PyObject *PyBallTree_dualcount_radius(PyObject *self, PyObject *args) {
 }
 
 static PyObject *PyBallTree_dualcount_range(PyObject *self, PyObject *args) {
-    PyBallTree *pytree = (PyBallTree *)self;
-
-    // Parse the Python arguments
     PyBallTree *other_tree;
     double rmin, rmax;
     if (!PyArg_ParseTuple(args, "O!dd", &PyBallTreeType, &other_tree, &rmin, &rmax)) {
         return NULL;
     }
 
+    PyBallTree *pytree = (PyBallTree *)self;
     double count = balltree_dualcount_range(
         pytree->balltree,
         other_tree->balltree,
@@ -743,16 +787,19 @@ PyMODINIT_FUNC PyInit_balltree(void) {
         return NULL;
     }
 
-    if (PyType_Ready(&PyBallTreeType) < 0) {
-        return NULL;
-    }
-    Py_INCREF(&PyBallTreeType);
-
     PyObject *module = PyModule_Create(&pyballtree);
     if (module == NULL) {
         return NULL;
     }
-    PyModule_AddObject(module, "BallTree", (PyObject *)&PyBallTreeType);
+
+    if (PyType_Ready(&PyBallTreeType) == -1) {
+        return NULL;
+    }
+    Py_INCREF(&PyBallTreeType);
+    if (PyModule_AddObject(module, "BallTree", (PyObject *)&PyBallTreeType) == -1) {
+        Py_DECREF(&PyBallTreeType);
+        return NULL;
+    }
 
     return module;
 }

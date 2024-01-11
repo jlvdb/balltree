@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
 PointBuffer *load_data_from_file() {
     PointBuffer *buffer = ptbuf_new(256);
     if (buffer == NULL) {
-        PRINT_ERR_MSG("memory allocation failed\n");
+        EMIT_ERR_MSG(MemoryError, "memory allocation failed");
         ptbuf_free(buffer);
         return NULL;
     }
@@ -107,7 +107,7 @@ PointBuffer *load_data_from_file() {
     static const char filepath[] = "testing/BOSS.txt";
     FILE *file = fopen(filepath, "r");
     if (file == NULL) {
-        PRINT_ERR_MSG("failed to open file: %s\n", filepath);
+        EMIT_ERR_MSG(OSError, "failed to open file: %s", filepath);
         ptbuf_free(buffer);
         return NULL;
     }
@@ -117,7 +117,7 @@ PointBuffer *load_data_from_file() {
     while (fscanf(file, "%lf %lf %lf", &point.x, &point.y, &point.z) == 3) {
         if (n_records == buffer->size) {
             if (ptbuf_resize(buffer, buffer->size * 2) != 0) {
-                PRINT_ERR_MSG("failed to expand buffer\n");
+                EMIT_ERR_MSG(MemoryError, "failed to expand buffer");
                 ptbuf_free(buffer);
                 fclose(file);
                 return NULL;
@@ -129,7 +129,7 @@ PointBuffer *load_data_from_file() {
     fclose(file);
 
     if (n_records == 0) {
-        PRINT_ERR_MSG("could not read any records from file\n");
+        EMIT_ERR_MSG(RuntimeError, "could not read any records from file");
         ptbuf_free(buffer);
         return NULL;
     }

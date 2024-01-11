@@ -9,20 +9,20 @@ static inline double rand_uniform(double low, double high);
 
 PointBuffer *ptbuf_new(int size) {
     if (size < 1) {
-        PRINT_ERR_MSG("PointBuffer size must be positive\n");
+        EMIT_ERR_MSG(ValueError, "PointBuffer size must be positive");
         return NULL;
     }
 
     PointBuffer *buffer = (PointBuffer *)malloc(sizeof(PointBuffer));
     if (buffer == NULL) {
-        PRINT_ERR_MSG("PointBuffer allocation failed\n");
+        EMIT_ERR_MSG(MemoryError, "PointBuffer allocation failed");
         return NULL;
     }
 
     size_t n_bytes = size * sizeof(Point);
     Point *points = (Point *)malloc(n_bytes);
     if (points == NULL) {
-        PRINT_ERR_MSG("PointBuffer memory allocation failed\n");
+        EMIT_ERR_MSG(MemoryError, "PointBuffer buffer allocation failed");
         free(buffer);
         return NULL;
     }
@@ -76,14 +76,14 @@ void ptbuf_free(PointBuffer *buffer) {
 
 int ptbuf_resize(PointBuffer *buffer, int size) {
     if (size < 1) {
-        PRINT_ERR_MSG("PointBuffer size must be positive\n");
+        EMIT_ERR_MSG(ValueError, "PointBuffer size must be positive");
         return BTR_FAILED;
     }
 
     size_t n_bytes = size * sizeof(Point);
     Point *points = (Point*)realloc(buffer->points, n_bytes);
     if (points == NULL) {
-        PRINT_ERR_MSG("PointBuffer resizing failed\n");
+        EMIT_ERR_MSG(MemoryError, "PointBuffer resizing failed");
         return BTR_FAILED;
     }
 
@@ -126,7 +126,7 @@ PointBuffer *ptbuf_gen_random(double low, double high, int num_points) {
 PointSlice *ptslc_from_buffer(const PointBuffer *buffer) {
     PointSlice *slice = (PointSlice*)malloc(sizeof(PointSlice));
     if (slice == NULL) {
-        PRINT_ERR_MSG("PointSlice allocation failed\n");
+        EMIT_ERR_MSG(MemoryError, "PointSlice allocation failed");
         return NULL;
     }
 

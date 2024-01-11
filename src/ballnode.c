@@ -183,7 +183,7 @@ static int ptslc_partition_maxspread_axis(PointSlice *slice) {
 static BallNode *bnode_init(PointBuffer *buffer, int start, int end) {
     BallNode *node = (BallNode *)calloc(1, sizeof(BallNode));
     if (node == NULL) {
-        PRINT_ERR_MSG("BallTree node allocation failed\n");
+        EMIT_ERR_MSG(MemoryError, "BallTree node allocation failed");
         return NULL;
     }
 
@@ -214,7 +214,7 @@ BallNode *bnode_build(PointBuffer *buffer, int start, int end, int leafsize) {
         // partition points at median of axis with max. value range (split-axis)
         int split_idx = ptslc_partition_maxspread_axis(&node->data);
         if (split_idx == -1) {
-            PRINT_ERR_MSG("could not determine median element for partitioning\n");
+            EMIT_ERR_MSG(ValueError, "could not determine median element for partitioning");
             bnode_free(node);
             return NULL;
         }
