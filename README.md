@@ -10,10 +10,9 @@ given (range of) separations. Fixed number nearest neighbour search is currently
 not implemented.
 
 Range queries are typically 25-30x faster than the corresponding implementation
-in `scipy.spatial.KDTree`
- tree.query_ball_point(p, radius, return_length=True)
+in `scipy.spatial.KDTree`.
 
-# Installation
+## Installation
 
 A `C` library can be built with the provided make file, the python wrapper is
 automatically compiled and installed with `pip install .`.
@@ -21,6 +20,7 @@ automatically compiled and installed with `pip install .`.
 The installation does not require any external `C` libraries, the python wrapper
 requires the `Python.h` header (which should be included in a default python
 installation) and `numpy` (including `numpy/arrayobject.h`).
+
 
 ## Usage
 
@@ -79,6 +79,7 @@ count = tree.count_radius(query_point, query_radius)
 print(f"pairs in r <= {query_radius:.1f}: {count:.0f}")
 ```
 
+
 ## Comparison to the `C` implementation in `scipy.spatial.KDTree`
 
 ### Setup
@@ -94,6 +95,7 @@ print(f"pairs in r <= {query_radius:.1f}: {count:.0f}")
     - `scipy.spatial.KDTree.count_neighbors(...)` (with unit weights)
 
 ### Results (single thread, AMD Epyc)
+
 - Single point query using all points:
 ```
     balltree.count_radius:     found 24688969825 pairs in  26.737 sec
@@ -106,6 +108,7 @@ print(f"pairs in r <= {query_radius:.1f}: {count:.0f}")
 ```
 
 This corresponds to a **speed of of 25-30x** given test hardware and dataset.
+
 
 ## Maintainers
 
