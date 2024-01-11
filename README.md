@@ -10,7 +10,14 @@ given (range of) separations. Fixed number nearest neighbour search is currently
 not implemented.
 
 Range queries are typically 25-30x faster than the corresponding implementation
-in `scipy.spatial.KDTree`.
+in `scipy.spatial.KDTree` (see below).
+
+#### Contents
+[Installation](#Installation)  
+[Usage](#Usage)  
+[Comparison scipy.spatial.KDTree](#Comparison-scipy.spatial.KDTree)  
+[Maintainers](#Maintainers)  
+
 
 ## Installation
 
@@ -80,7 +87,10 @@ print(f"pairs in r <= {query_radius:.1f}: {count:.0f}")
 ```
 
 
-## Comparison to the `C` implementation in `scipy.spatial.KDTree`
+## Comparison scipy.spatial.KDTree
+
+The python package `scipy` implements a popular KDTree in
+`scipy.spatial.KDTree`. The majority of this code is written in `Cython/C++`.
 
 ### Setup
 
