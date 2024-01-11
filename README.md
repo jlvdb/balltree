@@ -1,9 +1,33 @@
 # balltree
 
-Fast balltree implementation for 3-dim data with an Euclidean distance norm.
-The base implementation is in C and there is a wrapper for python in development.
+Fast balltree implementation for 3-dim (weighted) data with an Euclidean
+distance norm. The base implementation is in `C` and there is a wrapper for
+`Python`.
 
-## `C` usage
+The tree is optimised towards spatial correlation function calculations since
+the query routines are geared towards range queries, i.e. counting pairs with a
+given (range of) separations. Fixed number nearest neighbour search is currently
+not implemented.
+
+Range queries are typically 25-30x faster than the corresponding implementation
+in `scipy.spatial.KDTree`
+ tree.query_ball_point(p, radius, return_length=True)
+
+# Installation
+
+A `C` library can be built with the provided make file, the python wrapper is
+automatically compiled and installed with `pip install .`.
+
+The installation does not require any external `C` libraries, the python wrapper
+requires the `Python.h` header (which should be included in a default python
+installation) and `numpy` (including `numpy/arrayobject.h`).
+
+## Usage
+
+Below are two examples that illustrate how to use the ball tree from `C` and
+`Python`.
+
+### Using the `C` library
 
 ```c
 #include <stdio.h>
@@ -32,7 +56,7 @@ int main(int argc, char** argv) {
 }
 ```
 
-## `Python` usage
+### Using the `Python` wrapper
 
 ```python
 import numpy as np
@@ -54,3 +78,35 @@ query_radius = 0.2
 count = tree.count_radius(query_point, query_radius)
 print(f"pairs in r <= {query_radius:.1f}: {count:.0f}")
 ```
+
+## Comparison to the `C` implementation in `scipy.spatial.KDTree`
+
+### Setup
+
+- Dataset: `953,255` galaxies from the Baryon Oscillation Spectroscopic Survey,
+  converted from sky coordinates *(right ascension, declination)* to points on the
+  3D unit sphere *(x, y, z)*.
+- Counting pairs formed between all objects within a fixed radius of `r <= 0.2`:
+    - `balltree.count_radius(...)` (with unit weights)
+    - `scipy.spatial.KDTree.query_ball_point(..., return_length=True)` (no weights)
+- Counting the same pairs using the optimised dualtree algorithm.
+    - `balltree.dualcount_radius(...)` (with unit weights)
+    - `scipy.spatial.KDTree.count_neighbors(...)` (with unit weights)
+
+### Results (single thread, AMD Epyc)
+- Single point query using all points:
+```
+    balltree.count_radius:     found 24688969825 pairs in  26.737 sec
+    KDTree.query_ball_point:   found 24688969825 pairs in 630.395 sec
+```
+- Using the dualtree algorithm:
+```
+    balltree.dualcount_radius: found 24688969825 pairs in  11.591 sec
+    KDTree.count_neighbors:    found 24688969825 pairs in 321.993 sec
+```
+
+This corresponds to a **speed of of 25-30x** given test hardware and dataset.
+
+## Maintainers
+
+- Jan Luca van den Busch (author, Ruhr-Universität Bochum, Astronomisches Institut)
