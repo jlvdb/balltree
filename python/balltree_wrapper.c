@@ -102,8 +102,8 @@ static NpyIter *numpy_iter_point_arrays(
     PyArrayObject *weight_obj
 ) {
     const int n_arrays = 4;
-    PyArrayObject *arrays[n_arrays] = {x_obj, y_obj, z_obj, weight_obj};
-    npy_uint32 array_flags[n_arrays] = {
+    PyArrayObject *arrays[4] = {x_obj, y_obj, z_obj, weight_obj};
+    npy_uint32 array_flags[4] = {
         NPY_ITER_READONLY,
         NPY_ITER_READONLY,
         NPY_ITER_READONLY,
@@ -173,7 +173,7 @@ static npy_intp check_arrays_dtype_shape(
 
 static PyObject *numpy_ones_1dim(npy_intp size) {
     const npy_intp ndim = 1;
-    npy_intp shape[ndim] = {size};
+    npy_intp shape[1] = {size};
     PyObject *array = PyArray_EMPTY(ndim, shape, NPY_DOUBLE, 0);
     if (array == NULL) {
         PyErr_SetString(PyExc_MemoryError, "failed to allocate array");
@@ -256,7 +256,7 @@ static PointBuffer *ptbuf_from_numpy_array(
 
 static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
     const npy_intp ndim = 1;
-    npy_intp shape[ndim] = {buffer->size};
+    npy_intp shape[1] = {buffer->size};
 
     // construct an appropriate dtype for Point
     PyObject *arr_dtype = Py_BuildValue(
@@ -293,7 +293,7 @@ static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
 
 static PyObject *statvec_get_numpy_array(StatsVector *vec) {
     const npy_intp ndim = 1;
-    npy_intp shape[ndim] = {vec->end};
+    npy_intp shape[1] = {vec->end};
 
     // construct an appropriate dtype for StatsVector
     PyObject *arr_dtype = Py_BuildValue(
