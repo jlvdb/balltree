@@ -6,6 +6,7 @@
 StatsVector *statvec_new() {
     return statvec_new_reserve(32);
 }
+
 StatsVector *statvec_new_reserve(int reserve_size) {
     StatsVector *vec = (StatsVector *)malloc(sizeof(StatsVector));
     if (vec == NULL) {
