@@ -87,7 +87,7 @@ print(f"pairs in r <= {query_radius:.1f}: {count:.0f}")
 ```
 
 
-## Comparison scipy.spatial.KDTree
+## Comparison to scipy.spatial.KDTree
 
 The python package `scipy` implements a popular KDTree in
 `scipy.spatial.KDTree`. The majority of this code is written in `Cython/C++`.
