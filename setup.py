@@ -19,6 +19,7 @@ ext_module = Extension(
         "-ffast-math",
         "-march=native",
         "-funroll-all-loops",
+        "-DSET_PYERR_STRING",  # required to propagate C errors to python
     ],
 )
 
