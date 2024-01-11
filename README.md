@@ -13,10 +13,10 @@ Range queries are typically 25-30x faster than the corresponding implementation
 in `scipy.spatial.KDTree` (see below).
 
 #### Contents
-[Installation](#Installation)  
-[Usage](#Usage)  
-[Comparison scipy.spatial.KDTree](#Comparison-scipy.spatial.KDTree)  
-[Maintainers](#Maintainers)  
+[Installation](#installation)  
+[Usage](#usage)  
+[Comparison to scipy.spatial.KDTree](#comparison-to-scipyspatialkdtree)  
+[Maintainers](#aintainers)  
 
 
 ## Installation
