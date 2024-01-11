@@ -6,7 +6,7 @@
 #include "balltree.h"
 #include "balltree_macros.h"
 
-PointBuffer *load_data_from_file();
+PointBuffer *load_data_from_file(const char *filepath);
 
 int main(int argc, char** argv) {
     Point query_point;
@@ -22,8 +22,9 @@ int main(int argc, char** argv) {
     setlocale(LC_NUMERIC, "");
 
     // read the input file contents, show the elapsed time
+    const char filepath[] = "testing/BOSS.txt";
     time = clock();
-    buffer = load_data_from_file();
+    buffer = load_data_from_file(filepath);
     if (buffer == NULL) {
         return 1;
     }
@@ -72,15 +73,16 @@ int main(int argc, char** argv) {
     printf("self found %11.0lf pairs in %7.3lf sec\n", count, elapsed);
 
     // dump and restore
+    const char fpath[] = "testing/tree.dump";
     time = clock();
-    if (balltree_to_file(tree, "testing/tree.dump") != 0) {
+    if (balltree_to_file(tree, fpath) != 0) {
         balltree_free(tree);
         return 1;
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
     printf("dumped   in %7.3lf ms\n", elapsed);
     time = clock();
-    BallTree *tree2 = balltree_from_file("testing/tree.dump");
+    BallTree *tree2 = balltree_from_file(fpath);
     if (tree2 == NULL) {
         balltree_free(tree); 
         return 1;  
@@ -96,7 +98,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-PointBuffer *load_data_from_file() {
+PointBuffer *load_data_from_file(const char *filepath) {
     PointBuffer *buffer = ptbuf_new(256);
     if (buffer == NULL) {
         EMIT_ERR_MSG(MemoryError, "memory allocation failed");
@@ -104,7 +106,6 @@ PointBuffer *load_data_from_file() {
         return NULL;
     }
 
-    static const char filepath[] = "testing/BOSS.txt";
     FILE *file = fopen(filepath, "r");
     if (file == NULL) {
         EMIT_ERR_MSG(OSError, "failed to open file: %s", filepath);
