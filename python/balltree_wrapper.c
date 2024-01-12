@@ -576,7 +576,7 @@ static PyObject *PyBallTree_count_radius(
     PyObject *kwargs
 ) {
     static char *kwlist[] = {"point", "radius", "weight", NULL};
-    PyObject *coord_iter;  // TODO: refcount?
+    PyObject *coord_iter;
     double radius;
     double weight = 1.0;  // weight is optional
     if (!PyArg_ParseTupleAndKeywords(
@@ -601,7 +601,7 @@ static PyObject *PyBallTree_count_range(
     PyObject *kwargs
 ) {
     static char *kwlist[] = {"point", "rmin", "rmax", "weight", NULL};
-    PyObject *coord_iter;  // TODO: refcount?
+    PyObject *coord_iter;
     double rmin, rmax;
     double weight = 1.0;  // weight is optional
     if (!PyArg_ParseTupleAndKeywords(
