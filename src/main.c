@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
     printf("self found %11.0lf pairs in %7.3lf sec\n", count, elapsed);
 
     // dump and restore
-    const char fpath[] = "testing/tree.dump";
+    const char fpath[] = "testing/serialised.tree";
     time = clock();
     if (balltree_to_file(tree, fpath) != 0) {
         balltree_free(tree);
