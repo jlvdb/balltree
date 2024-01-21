@@ -3,34 +3,52 @@
 
 #include "point.h"
 
-struct BallNode {
-    Point center;
+typedef struct {
+    double x;
+    double y;
+    double z;
     double radius;
-    double sum_weight;
-    PointSlice data;
+} Ball;
+
+struct BallNode;
+
+typedef struct {
     struct BallNode *left;
     struct BallNode *right;
+} Childs;
+
+struct BallNode {
+    Ball ball;
+    union {
+        Childs childs;
+        PointSlice data;
+    };
+    double sum_weight;
+    long num_points;
 };
 typedef struct BallNode BallNode;
 
+#define BALLNODE_IS_LEAF(node) (node)->num_points > 0
+
 typedef struct {
-    int depth;
-    int n_points;
+    long depth;
+    long num_points;
     double sum_weight;
     double x, y, z;
     double radius;
 } NodeStats;
 
 typedef struct {
+    NodeStats *stats;
     int size;
     int end;
-    NodeStats *stats;
 } StatsVector;
 
 // from ballnode.c
-BallNode *bnode_build(PointBuffer *, int, int, int);
+BallNode *bnode_build(PointSlice *, int);
 void bnode_free(BallNode *);
 int bnode_is_leaf(const BallNode *);
+PointSlice bnode_get_ptslc(const BallNode *);
 
 // from ballnode_query.c
 double bnode_count_radius(const BallNode *, const Point *, double);

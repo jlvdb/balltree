@@ -10,21 +10,7 @@ static double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *poin
 static double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *point, double rmin_sq, double rmax_sq);
 static double ptslc_dualsumw_in_radius_sq(const PointSlice *slice1, const PointSlice *slice2, double rad_sq);
 static double ptslc_dualsumw_in_range_sq(const PointSlice *slice1, const PointSlice *slice2, double rmin_sq, double rmax_sq);
-// the functions below are defined elsewhere but redefined as inline for performance
-static inline double _point_dist_sq(const Point *p1, const Point *p2);
-static inline int _bnode_is_leaf(const BallNode *node);
 
-
-static inline double _point_dist_sq(const Point *p1, const Point *p2) {
-    double dx = p1->x - p2->x;
-    double dy = p1->y - p2->y;
-    double dz = p1->z - p2->z;
-    return dx*dx + dy*dy + dz*dz;
-}
-
-static inline int _bnode_is_leaf(const BallNode *node) {
-    return (node->left == NULL && node->right == NULL) ? true : false;
-}
 
 static double ptslc_sumw_in_radius_sq(
     const PointSlice *slice,
@@ -35,7 +21,7 @@ static double ptslc_sumw_in_radius_sq(
     Point *points = slice->points;
     for (int i = slice->start; i < slice->end; ++i) {
         Point *point_i = points + i;
-        double dist_sq = _point_dist_sq(point_i, point);
+        double dist_sq = EUCLIDEAN_DIST_SQ(point_i, point);
         // add point weight if condition is met otherwise zero
         int dist_mask = dist_sq <= rad_sq;
         sumw += point_i->weight * (double)dist_mask;
@@ -53,7 +39,7 @@ static double ptslc_sumw_in_range_sq(
     Point *points = slice->points;
     for (int i = slice->start; i < slice->end; ++i) {
         Point *point_i = points + i;
-        double dist_sq = _point_dist_sq(point_i, point);
+        double dist_sq = EUCLIDEAN_DIST_SQ(point_i, point);
         // add point weight if condition is met otherwise zero
         int dist_mask = rmin_sq < dist_sq || dist_sq <= rmax_sq;
         sumw += point_i->weight * (double)dist_mask;
@@ -95,18 +81,19 @@ double bnode_count_radius(
     const Point *point,
     double radius
 ) {
-    double distance = sqrt(_point_dist_sq(&node->center, point));
+    double distance = sqrt(EUCLIDEAN_DIST_SQ(&node->ball, point));
+    double node_radius = node->ball.radius;
 
     // case: all points must be pairs
-    if (distance <= radius - node->radius) {
+    if (distance <= radius - node_radius) {
         return point->weight * node->sum_weight;
     }
     
     // case: some points may be pairs
-    else if (distance <= radius + node->radius) {
-        if (_bnode_is_leaf(node) == false) {
-            return bnode_count_radius(node->left, point, radius) +
-                   bnode_count_radius(node->right, point, radius);
+    else if (distance <= radius + node_radius) {
+        if (BALLNODE_IS_LEAF(node) == false) {
+            return bnode_count_radius(node->childs.left, point, radius) +
+                   bnode_count_radius(node->childs.right, point, radius);
         }
         // O(n): check each pair individually
         return point->weight * ptslc_sumw_in_radius_sq(
@@ -125,18 +112,19 @@ double bnode_count_range(
     double rmin,
     double rmax
 ) {
-    double distance = sqrt(_point_dist_sq(&node->center, point));
+    double distance = sqrt(EUCLIDEAN_DIST_SQ(&node->ball, point));
+    double node_radius = node->ball.radius;
 
     // case: all points must be pairs
-    if (rmin + node->radius < distance && distance <= rmax - node->radius) {
+    if (rmin + node_radius < distance && distance <= rmax - node_radius) {
         return point->weight * node->sum_weight;
     }
 
     // case: some points may be pairs
-    else if (rmin - node->radius < distance || distance <= rmax + node->radius) {
-        if (_bnode_is_leaf(node) == false) {
-            return bnode_count_range(node->left, point, rmin, rmax) +
-                   bnode_count_range(node->right, point, rmin, rmax);
+    else if (rmin - node_radius < distance || distance <= rmax + node_radius) {
+        if (BALLNODE_IS_LEAF(node) == false) {
+            return bnode_count_range(node->childs.left, point, rmin, rmax) +
+                   bnode_count_range(node->childs.right, point, rmin, rmax);
         }
         // O(n): check each pair individually
         return point->weight * ptslc_sumw_in_range_sq(
@@ -155,8 +143,8 @@ double bnode_dualcount_radius(
     const BallNode *node2,
     double radius
 ) {
-    double distance = sqrt(_point_dist_sq(&node1->center, &node2->center));
-    double sum_node_radii = node1->radius + node2->radius;
+    double distance = sqrt(EUCLIDEAN_DIST_SQ(&node1->ball, &node2->ball));
+    double sum_node_radii = node1->ball.radius + node2->ball.radius;
 
     // case: all points must be pairs
     if (distance <= radius - sum_node_radii) {
@@ -165,27 +153,27 @@ double bnode_dualcount_radius(
 
     // case: some points may be pairs
     else if (distance <= radius + sum_node_radii) {
-        int node1_is_leaf = _bnode_is_leaf(node1);
-        int node2_is_leaf = _bnode_is_leaf(node2);
+        int node1_is_leaf = BALLNODE_IS_LEAF(node1);
+        int node2_is_leaf = BALLNODE_IS_LEAF(node2);
 
         // case: both nodes can be traversed further
         if (node1_is_leaf == false && node2_is_leaf == false) {
-            return bnode_dualcount_radius(node1->left, node2->left, radius) +
-                   bnode_dualcount_radius(node1->left, node2->right, radius) +
-                   bnode_dualcount_radius(node1->right, node2->left, radius) +
-                   bnode_dualcount_radius(node1->right, node2->right, radius);
+            return bnode_dualcount_radius(node1->childs.left, node2->childs.left, radius) +
+                   bnode_dualcount_radius(node1->childs.left, node2->childs.right, radius) +
+                   bnode_dualcount_radius(node1->childs.right, node2->childs.left, radius) +
+                   bnode_dualcount_radius(node1->childs.right, node2->childs.right, radius);
         }
 
         // case: node1 can be traversed further
         else if (node1_is_leaf == false) {
-            return bnode_dualcount_radius(node1->left, node2, radius) +
-                   bnode_dualcount_radius(node1->right, node2, radius);
+            return bnode_dualcount_radius(node1->childs.left, node2, radius) +
+                   bnode_dualcount_radius(node1->childs.right, node2, radius);
         }
 
         // case: node2 can be traversed further
         else if (node2_is_leaf == false) {
-            return bnode_dualcount_radius(node1, node2->left, radius) +
-                   bnode_dualcount_radius(node1, node2->right, radius);
+            return bnode_dualcount_radius(node1, node2->childs.left, radius) +
+                   bnode_dualcount_radius(node1, node2->childs.right, radius);
         }
 
         // O(n^2): check pairs formed between points of both nodes individually
@@ -205,8 +193,8 @@ double bnode_dualcount_range(
     double rmin,
     double rmax
 ) {
-    double distance = sqrt(_point_dist_sq(&node1->center, &node2->center));
-    double sum_node_radii = node1->radius + node2->radius;
+    double distance = sqrt(EUCLIDEAN_DIST_SQ(&node1->ball, &node2->ball));
+    double sum_node_radii = node1->ball.radius + node2->ball.radius;
 
     // case: all points must be pairs
     if (rmin + sum_node_radii < distance && distance <= rmax - sum_node_radii) {
@@ -215,27 +203,27 @@ double bnode_dualcount_range(
 
     // case: some points may be pairs
     else if (rmin - sum_node_radii < distance || distance <= rmax + sum_node_radii) {
-        int node1_is_leaf = _bnode_is_leaf(node1);
-        int node2_is_leaf = _bnode_is_leaf(node2);
+        int node1_is_leaf = BALLNODE_IS_LEAF(node1);
+        int node2_is_leaf = BALLNODE_IS_LEAF(node2);
 
         // case: both nodes can be traversed further
         if (node1_is_leaf == false && node2_is_leaf == false) {
-            return bnode_dualcount_range(node1->left, node2->left, rmin, rmax) +
-                   bnode_dualcount_range(node1->left, node2->right, rmin, rmax) +
-                   bnode_dualcount_range(node1->right, node2->left, rmin, rmax) +
-                   bnode_dualcount_range(node1->right, node2->right, rmin, rmax);
+            return bnode_dualcount_range(node1->childs.left, node2->childs.left, rmin, rmax) +
+                   bnode_dualcount_range(node1->childs.left, node2->childs.right, rmin, rmax) +
+                   bnode_dualcount_range(node1->childs.right, node2->childs.left, rmin, rmax) +
+                   bnode_dualcount_range(node1->childs.right, node2->childs.right, rmin, rmax);
         }
 
         // case: node1 can be traversed further
         else if (node1_is_leaf == false) {
-            return bnode_dualcount_range(node1->left, node2, rmin, rmax) +
-                   bnode_dualcount_range(node1->right, node2, rmin, rmax);
+            return bnode_dualcount_range(node1->childs.left, node2, rmin, rmax) +
+                   bnode_dualcount_range(node1->childs.right, node2, rmin, rmax);
         }
 
         // case: node2 can be traversed further
         else if (node2_is_leaf == false) {
-            return bnode_dualcount_range(node1, node2->left, rmin, rmax) +
-                   bnode_dualcount_range(node1, node2->right, rmin, rmax);
+            return bnode_dualcount_range(node1, node2->childs.left, rmin, rmax) +
+                   bnode_dualcount_range(node1, node2->childs.right, rmin, rmax);
         }
 
         // O(n^2): check pairs formed between points of both nodes individually

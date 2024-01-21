@@ -66,24 +66,24 @@ int statvec_append(StatsVector *vec, const NodeStats *stats) {
 int bnode_collect_stats(const BallNode *node, StatsVector *vec, int depth) {
     NodeStats stats = {
         .depth = depth,
-        .n_points = ptslc_get_size(&node->data),
+        .num_points = labs(node->num_points),
         .sum_weight = node->sum_weight,
-        .x = node->center.x,
-        .y = node->center.y,
-        .z = node->center.z,
-        .radius = node->radius
+        .x = node->ball.x,
+        .y = node->ball.y,
+        .z = node->ball.z,
+        .radius = node->ball.radius
     };
     if (statvec_append(vec, &stats) == BTR_FAILED) {
         return BTR_FAILED;
     }
 
-    if (node->left != NULL) {
-        if (bnode_collect_stats(node->left, vec, depth + 1) == BTR_FAILED) {
+    if (node->childs.left != NULL) {
+        if (bnode_collect_stats(node->childs.left, vec, depth + 1) == BTR_FAILED) {
             return BTR_FAILED;
         }
     }
-    if (node->right != NULL) {
-        if (bnode_collect_stats(node->right, vec, depth + 1) == BTR_FAILED) {
+    if (node->childs.right != NULL) {
+        if (bnode_collect_stats(node->childs.right, vec, depth + 1) == BTR_FAILED) {
             return BTR_FAILED;
         }
     }
@@ -92,11 +92,11 @@ int bnode_collect_stats(const BallNode *node, StatsVector *vec, int depth) {
 
 int bnode_count_nodes(const BallNode *node) {
     int count = 1;
-    if (node->left != NULL) {
-        count += bnode_count_nodes(node->left);
+    if (node->childs.left != NULL) {
+        count += bnode_count_nodes(node->childs.left);
     }
-    if (node->right != NULL) {
-        count += bnode_count_nodes(node->right);
+    if (node->childs.right != NULL) {
+        count += bnode_count_nodes(node->childs.right);
     }
     return count;
 }

@@ -10,6 +10,7 @@ typedef struct {
     BallNode *root;
     PointBuffer data;
     int leafsize;
+    int data_owned;
 } BallTree;
 
 // from balltree.c
