@@ -1,4 +1,3 @@
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -11,14 +10,14 @@ static int ptbuf_write(const PointBuffer *buffer, FILE *file);
 static PointBuffer *ptbuf_read(int n_items, FILE *file);
 
 typedef struct {
-    int size;
     BallNode *nodes;
-    int next_free;
+    size_t next_free;
+    int size;
 } BNodeBuffer;
 
 static BNodeBuffer *bnodebuffer_new(int size);
 static void bnodebuffer_free(BNodeBuffer *buffer);
-static int bnodebuffer_get_next_free(BNodeBuffer *buffer);
+static size_t bnodebuffer_get_next_free(BNodeBuffer *buffer);
 static int bnodebuffer_write(const BNodeBuffer *buffer, FILE *file);
 static BNodeBuffer *bnodebuffer_read(int n_items, FILE *file);
 
@@ -28,18 +27,18 @@ typedef struct {
 } SectionHeader;
 
 typedef struct {
-    int leafsize;
     SectionHeader points;
     SectionHeader nodes;
+    int leafsize;
+    int data_owned;
 } FileHeader;
 
 static FileHeader *fileheader_new(const BallTree *tree);
 static int fileheader_write(const FileHeader *header, FILE *file);
 static FileHeader *fileheader_read(FILE *file);
 
-static inline intptr_t child_ptr_substitute(const BallNode *child, BNodeBuffer *buffer);
-static int bnode_serialise(const BallNode *node, BNodeBuffer *buffer, int buf_idx);
-static BallNode *bnode_deserialise(const BNodeBuffer *buffer, Point *points, int buf_idx);
+static int bnode_serialise(const BallNode *node, BNodeBuffer *buffer, size_t buf_idx);
+static BallNode *bnode_deserialise(const BNodeBuffer *buffer, Point *points, size_t buf_idx);
 
 
 static int ptbuf_write(const PointBuffer *buffer, FILE *file) {
@@ -91,7 +90,7 @@ static void bnodebuffer_free(BNodeBuffer *buffer) {
     }
 }
 
-static int bnodebuffer_get_next_free(BNodeBuffer *buffer) {
+static size_t bnodebuffer_get_next_free(BNodeBuffer *buffer) {
     return (buffer->next_free)++;
 }
 
@@ -127,15 +126,16 @@ static FileHeader *fileheader_new(const BallTree *tree) {
         return NULL;
     }
 
-    header->leafsize = tree->leafsize;
     header->points = (SectionHeader){
         .n_items = tree->data.size,
-        .itemsize = sizeof(*tree->data.points)
+        .itemsize = sizeof(Point),
     };
     header->nodes = (SectionHeader){
         .n_items = balltree_count_nodes(tree),
-        .itemsize = sizeof(*tree->root)
+        .itemsize = sizeof(BallNode),
     };
+    header->leafsize = tree->leafsize;
+    header->data_owned = tree->data_owned;
     return header;
 }
 
@@ -165,35 +165,30 @@ static FileHeader *fileheader_read(FILE *file) {
     return header;
 }
 
-static inline intptr_t child_ptr_substitute(const BallNode *child, BNodeBuffer *buffer) {
-    return (child == NULL) ? 0 : bnodebuffer_get_next_free(buffer);
-}
-
-static int bnode_serialise(const BallNode *node, BNodeBuffer *buffer, int buf_idx) {
+static int bnode_serialise(const BallNode *node, BNodeBuffer *buffer, size_t buf_idx) {
     if (buffer->next_free > buffer->size) {
         EMIT_ERR_MSG(IndexError, "buffer is too small to store further nodes");
         return BTR_FAILED;
     }
 
-    // insert into buffer
+    // insert copy of current node into buffer
     BallNode *stored = buffer->nodes + buf_idx;
     *stored = *node;
-    stored->data.points = NULL;  // pointer not valid after deserialisation
 
-    // replace pointers to childs by index in buffer they will be stored at
-    intptr_t left_idx = child_ptr_substitute(node->left, buffer);
-    intptr_t right_idx = child_ptr_substitute(node->right, buffer);
-    stored->left = (BallNode *)left_idx;
-    stored->right = (BallNode *)right_idx;
+    if (BALLNODE_IS_LEAF(node)) {
+        stored->data.points = NULL;
+    } else {
+        // replace pointers to childs by index in buffer they will be stored at
+        size_t left_idx = bnodebuffer_get_next_free(buffer);
+        size_t right_idx = bnodebuffer_get_next_free(buffer);
+        stored->childs.left = (BallNode *)left_idx;
+        stored->childs.right = (BallNode *)right_idx;
 
-    // serialise childs recursively
-    if (left_idx != 0) {
-        if (bnode_serialise(node->left, buffer, left_idx) == BTR_FAILED) {
+        // serialise childs recursively
+        if (bnode_serialise(node->childs.left, buffer, left_idx) == BTR_FAILED) {
             return BTR_FAILED;
         }
-    }
-    if (right_idx != 0) {
-        if (bnode_serialise(node->right, buffer, right_idx) == BTR_FAILED) {
+        if (bnode_serialise(node->childs.right, buffer, right_idx) == BTR_FAILED) {
             return BTR_FAILED;
         }
     }
@@ -227,7 +222,7 @@ int balltree_to_file(const BallTree *tree, const char *path) {
         goto err_dealloc_header;
     }
     free(header);
-    int root_index = bnodebuffer_get_next_free(nodebuffer);
+    size_t root_index = bnodebuffer_get_next_free(nodebuffer);
     if (bnode_serialise(tree->root, nodebuffer, root_index) == BTR_FAILED) {
         bnodebuffer_free(nodebuffer);
         goto err_close_file;
@@ -255,7 +250,7 @@ err_close_file:
 static BallNode *bnode_deserialise(
     const BNodeBuffer *buffer,
     Point *points,
-    int buf_idx
+    size_t buf_idx
 ) {
     if (buf_idx >= buffer->size) {
         EMIT_ERR_MSG(IndexError, "node index exceeds node buffer size");
@@ -271,25 +266,24 @@ static BallNode *bnode_deserialise(
     }
     *node = *stored;
 
-    // restore the pointers with valid addresses
-    node->data.points = points;
-    int left_idx = (intptr_t)node->left;
-    int right_idx = (intptr_t)node->right;
-    if (left_idx != 0) {
-        node->left = bnode_deserialise(buffer, points, left_idx);
-        if (node->left == NULL) {
+    if (BALLNODE_IS_LEAF(node)) {
+        // store the indices of start and end in the points buffer as childs
+        node->data.points = points;
+    } else {
+        size_t left_idx = (size_t)node->childs.left;
+        size_t right_idx = (size_t)node->childs.right;
+        node->childs.left = bnode_deserialise(buffer, points, left_idx);
+        if (node->childs.left == NULL) {
+            free(node);
+            return NULL;
+        }
+        node->childs.right = bnode_deserialise(buffer, points, right_idx);
+        if (node->childs.right == NULL) {
             free(node);
             return NULL;
         }
     }
-    if (right_idx != 0) {
-        node->right = bnode_deserialise(buffer, points, right_idx);
-        if (node->right == NULL) {
-            bnode_free(node->left);
-            free(node);
-            return NULL;
-        }
-    }
+
     return node;
 }
 
@@ -312,6 +306,7 @@ BallTree* balltree_from_file(const char *path) {
         goto err_close_file;
     }
     tree->leafsize = header->leafsize;
+    tree->data_owned = 1;  // after deserialising, the buffer from the file is used
 
     // read tree's data points from the file
     PointBuffer *points = ptbuf_read(header->points.n_items, file);

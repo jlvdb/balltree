@@ -66,7 +66,7 @@ int statvec_append(StatsVector *vec, const NodeStats *stats) {
 int bnode_collect_stats(const BallNode *node, StatsVector *vec, int depth) {
     NodeStats stats = {
         .depth = depth,
-        .num_points = labs(node->num_points),
+        .num_points = node->num_points,
         .sum_weight = node->sum_weight,
         .x = node->ball.x,
         .y = node->ball.y,
@@ -92,10 +92,8 @@ int bnode_collect_stats(const BallNode *node, StatsVector *vec, int depth) {
 
 int bnode_count_nodes(const BallNode *node) {
     int count = 1;
-    if (node->childs.left != NULL) {
+    if (!BALLNODE_IS_LEAF(node)) {
         count += bnode_count_nodes(node->childs.left);
-    }
-    if (node->childs.right != NULL) {
         count += bnode_count_nodes(node->childs.right);
     }
     return count;

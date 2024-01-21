@@ -200,6 +200,8 @@ BallNode *bnode_build(PointSlice *slice, int leafsize) {
     // case: leaf node
     if (num_points <= leafsize) {
         node->data = *slice;
+
+        node->is_leaf = 1;
         node->num_points = num_points;
         node->sum_weight = ptslc_sum_weights(slice);
     }
@@ -235,9 +237,9 @@ BallNode *bnode_build(PointSlice *slice, int leafsize) {
         }
 
         // use number of points and weights computed further down in the leaf nodes
-        node->num_points = -(  // negative number indicates no leaf node
-            labs(node->childs.left->num_points) +
-            labs(node->childs.right->num_points));
+        node->is_leaf = 0;
+        node->num_points = node->childs.left->num_points +
+                           node->childs.right->num_points;
         node->sum_weight = node->childs.left->sum_weight +
                            node->childs.right->sum_weight;
     }

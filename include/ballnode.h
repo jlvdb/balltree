@@ -20,15 +20,18 @@ typedef struct {
 struct BallNode {
     Ball ball;
     union {
-        Childs childs;
-        PointSlice data;
+        Childs childs;    // is_leaf == 0
+        PointSlice data;  // is_leaf == 1
+    };
+    struct {
+        unsigned long is_leaf : 1;
+        unsigned long num_points : 63;
     };
     double sum_weight;
-    long num_points;
 };
 typedef struct BallNode BallNode;
 
-#define BALLNODE_IS_LEAF(node) (node)->num_points > 0
+#define BALLNODE_IS_LEAF(node) (node)->is_leaf
 
 typedef struct {
     long depth;
