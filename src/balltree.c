@@ -25,7 +25,7 @@ BallTree *balltree_build_leafsize(const PointBuffer *buffer, int leafsize) {
 }
 
 BallTree *balltree_build_nocopy(PointBuffer *buffer, int leafsize) {
-    int size = buffer->size;
+    long size = buffer->size;
     if (size < 1) {
         EMIT_ERR_MSG(ValueError, "need at least one input data point to build a tree");
         return NULL;
@@ -65,7 +65,7 @@ void balltree_free(BallTree *tree) {
     free(tree);
 }
 
-int balltree_count_nodes(const BallTree *tree) {
+long balltree_count_nodes(const BallTree *tree) {
     return bnode_count_nodes(tree->root);
 }
 
@@ -104,7 +104,7 @@ double balltree_dualcount_range(
 }
 
 StatsVector *balltree_collect_stats(const BallTree *tree) {
-    int num_nodes = balltree_count_nodes(tree);
+    long num_nodes = balltree_count_nodes(tree);
     StatsVector *vec = statvec_new_reserve(num_nodes);
     if (vec == NULL) {
         return NULL;

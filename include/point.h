@@ -20,7 +20,7 @@ typedef struct {
 
 typedef struct {
     Point *points;
-    int size;
+    long size;
 } PointBuffer;
 
 typedef struct {
@@ -35,15 +35,15 @@ double point_dist(const Point *, const Point *);
 double point_dist_sq(const Point *, const Point *);
 
 // from pointbuffers.c
-PointBuffer *ptbuf_new(int);
-PointBuffer *ptbuf_from_buffers(int, double *, double *, double *);
-PointBuffer *ptbuf_from_buffers_weighted(int, double *, double *, double *, double *);
+PointBuffer *ptbuf_new(long);
+PointBuffer *ptbuf_from_buffers(long, double *, double *, double *);
+PointBuffer *ptbuf_from_buffers_weighted(long, double *, double *, double *, double *);
 void ptbuf_free(PointBuffer *);
-int ptbuf_resize(PointBuffer *, int);
+int ptbuf_resize(PointBuffer *, long);
 PointBuffer *ptbuf_copy(const PointBuffer *);
-PointBuffer *ptbuf_gen_random(double, double, int);
+PointBuffer *ptbuf_gen_random(double, double, long);
 
 PointSlice *ptslc_from_buffer(const PointBuffer *);
-int ptslc_get_size(const PointSlice *);
+long ptslc_get_size(const PointSlice *);
 
 #endif /* POINT_H */

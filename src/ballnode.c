@@ -76,7 +76,7 @@ static Ball ball_from_ptslc(const PointSlice *slice) {
     double center_x = 0.0;
     double center_y = 0.0;
     double center_z = 0.0;
-    int total = 0;
+    size_t total = 0;
 
     for (const Point *point = slice->start; point < slice->end; ++point) {
         ++total;

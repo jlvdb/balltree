@@ -43,8 +43,8 @@ typedef struct {
 
 typedef struct {
     NodeStats *stats;
-    int size;
-    int end;
+    NodeStats *end;
+    long size;
 } StatsVector;
 
 // from ballnode.c
@@ -60,11 +60,11 @@ double bnode_dualcount_radius(const BallNode *, const BallNode *, double);
 double bnode_dualcount_range(const BallNode *, const BallNode *, double, double);
 
 // from ballnode_stats.c
-StatsVector *statvec_new_reserve(int);
+StatsVector *statvec_new_reserve(long);
 void statvec_free(StatsVector *);
-int statvec_resize(StatsVector *, int);
+int statvec_resize(StatsVector *, long);
 int statvec_append(StatsVector *, const NodeStats *);
 int bnode_collect_stats(const BallNode *, StatsVector *, int);
-int bnode_count_nodes(const BallNode *);
+long bnode_count_nodes(const BallNode *);
 
 #endif /* BALLNODE_H */

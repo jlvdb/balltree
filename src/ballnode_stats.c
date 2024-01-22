@@ -4,17 +4,20 @@
 #include "balltree_macros.h"
 
 StatsVector *statvec_new() {
-    return statvec_new_reserve(32);
+    return statvec_new_reserve(32L);
 }
 
-StatsVector *statvec_new_reserve(int reserve_size) {
+StatsVector *statvec_new_reserve(long reserve_size) {
+    if (reserve_size < 1) {
+        EMIT_ERR_MSG(MemoryError, "StatsVector size must be positive");
+        return NULL;
+    }
+
     StatsVector *vec = (StatsVector *)malloc(sizeof(StatsVector));
     if (vec == NULL) {
         EMIT_ERR_MSG(MemoryError, "StatsVector allocation failed");
         return NULL;
     }
-    vec->size = reserve_size;
-    vec->end = 0;
 
     vec->stats = (NodeStats *)malloc(vec->size * sizeof(NodeStats));
     if (vec->stats == NULL) {
@@ -22,6 +25,8 @@ StatsVector *statvec_new_reserve(int reserve_size) {
         free(vec);
         return NULL;
     }
+    vec->end = vec->stats;
+    vec->size = reserve_size;
     return vec;
 }
 
@@ -32,7 +37,7 @@ void statvec_free(StatsVector *vec) {
     free(vec);
 }
 
-int statvec_resize(StatsVector *vec, int size) {
+int statvec_resize(StatsVector *vec, long size) {
     if (size < 1) {
         EMIT_ERR_MSG(ValueError, "StatsVector size must be positive");
         return BTR_FAILED;
@@ -46,19 +51,20 @@ int statvec_resize(StatsVector *vec, int size) {
     }
 
     vec->stats = stats;
+    size_t offset = (vec->size < size) ? vec->size : size;
+    vec->end = stats + offset;
     vec->size = size;
-    vec->end = (vec->end > size) ? size : vec->end;
     return BTR_SUCCESS;
 }
 
 int statvec_append(StatsVector *vec, const NodeStats *stats) {
-    if (vec->end >= vec->size) {
+    if ((vec->end - vec->stats) >= vec->size) {
         // double the vector size if necessary
         if (statvec_resize(vec, vec->size * 2) == BTR_FAILED) {
             return BTR_FAILED;
         }
     }
-    vec->stats[vec->end] = *stats;
+    *vec->end = *stats;
     ++(vec->end);
     return BTR_SUCCESS;
 }
@@ -90,12 +96,11 @@ int bnode_collect_stats(const BallNode *node, StatsVector *vec, int depth) {
     return BTR_SUCCESS;
 }
 
-int bnode_count_nodes(const BallNode *node) {
-    int count = 1;
+long bnode_count_nodes(const BallNode *node) {
+    long count = 1;
     if (!BALLNODE_IS_LEAF(node)) {
         count += bnode_count_nodes(node->childs.left);
         count += bnode_count_nodes(node->childs.right);
     }
     return count;
 }
-
