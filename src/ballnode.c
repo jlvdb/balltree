@@ -19,13 +19,12 @@ static double limits_get_range(Limits *limits);
 static inline void point_swap(Point *p1, Point *p2);
 static inline double point_get_coord(const Point *point, enum Axis axis);
 static double ptslc_sum_weights(const PointSlice *);
-static Point ptslc_get_mean(const PointSlice *);
-static double ptslc_get_maxdist(const PointSlice *, Point *);
+static void ball_update_radius(Ball *ball, const PointSlice *slice);
+static Ball ball_from_ptslc(const PointSlice *slice);
 static enum Axis ptslc_get_maxspread_axis(const PointSlice *);
-static int ptslc_partition(PointSlice *slice, int pivot_idx, enum Axis axis);
-static int ptslc_quickselect(PointSlice *slice, int partition_idx, enum Axis axis);
-static int ptslc_partition_maxspread_axis(PointSlice *slice);
-static BallNode *bnode_init(PointBuffer *buffer, int start, int end);
+static Point *ptslc_partition(PointSlice *slice, Point *pivot, enum Axis axis);
+static Point *ptslc_quickselect(PointSlice *slice, Point *partition, enum Axis axis);
+static Point *ptslc_partition_maxspread_axis(PointSlice *slice);
 
 
 static Limits limits_new() {
@@ -56,42 +55,45 @@ static inline double point_get_coord(const Point *point, enum Axis axis) {
 
 static double ptslc_sum_weights(const PointSlice *slice) {
     double sumw = 0.0;
-    Point *points = slice->points;
-    for (int i = slice->start; i < slice->end; ++i) {
-        Point *point_i = points + i;
-        sumw += point_i->weight;
+    for (const Point *point = slice->start; point < slice->end; ++point) {
+        sumw += point->weight;
     }
     return sumw;
 }
 
-static Point ptslc_get_mean(const PointSlice *slice) {
-    double center_x = 0.0;
-    double center_y = 0.0;
-    double center_z = 0.0;
-    int total = 0;
-
-    Point *points = slice->points;
-    for (int i = slice->start; i < slice->end; ++i) {
-        ++total;
-        double scale = (double)total;
-        Point point = points[i];
-        center_x += (point.x - center_x) / scale;
-        center_y += (point.y - center_y) / scale;
-        center_z += (point.z - center_z) / scale;
-    }
-    return point_create(center_x, center_y, center_z);
-}
-
-static double ptslc_get_maxdist(const PointSlice *slice, Point *center) {
-    Point *points = slice->points;
+static void ball_update_radius(Ball *ball, const PointSlice *slice) {
     double dist_squared_max = 0.0;
-    for (int i = slice->start; i < slice->end; ++i) {
-        double dist_squared = point_dist_sq(points + i, center);
+    for (const Point *point = slice->start; point < slice->end; ++point) {
+        double dist_squared = EUCLIDEAN_DIST_SQ(point, ball);
         if (dist_squared > dist_squared_max) {
             dist_squared_max = dist_squared;
         }
     }
-    return sqrt(dist_squared_max);
+    ball->radius = sqrt(dist_squared_max);
+}
+
+static Ball ball_from_ptslc(const PointSlice *slice) {
+    double center_x = 0.0;
+    double center_y = 0.0;
+    double center_z = 0.0;
+    size_t total = 0;
+
+    for (const Point *point = slice->start; point < slice->end; ++point) {
+        ++total;
+        double scale = (double)total;
+        center_x += (point->x - center_x) / scale;
+        center_y += (point->y - center_y) / scale;
+        center_z += (point->z - center_z) / scale;
+    }
+
+    Ball ball = {
+        .x = center_x,
+        .y = center_y,
+        .z = center_z,
+        .radius = -1.0,
+    };
+    ball_update_radius(&ball, slice);
+    return ball;
 }
 
 static enum Axis ptslc_get_maxspread_axis(const PointSlice *slice) {
@@ -99,9 +101,7 @@ static enum Axis ptslc_get_maxspread_axis(const PointSlice *slice) {
     Limits y_lim = limits_new();
     Limits z_lim = limits_new();
 
-    Point *points = slice->points;
-    for (int i = slice->start; i < slice->end; ++i) {
-        Point *point = points + i;
+    for (const Point *point = slice->start; point < slice->end; ++point) {
         limits_update(&x_lim, point->x);
         limits_update(&y_lim, point->y);
         limits_update(&z_lim, point->z);
@@ -119,137 +119,144 @@ static enum Axis ptslc_get_maxspread_axis(const PointSlice *slice) {
     }
 }
 
-static int ptslc_partition(PointSlice *slice, int pivot_idx, enum Axis axis) {
-    Point *points = slice->points;
-    int last_idx = slice->end - 1;
+static Point *ptslc_partition(PointSlice *slice, Point *pivot, enum Axis axis) {
+    Point *last = slice->end - 1;
 
-    double pivot = point_get_coord(points + pivot_idx, axis);
-    point_swap(points + pivot_idx, points + last_idx);
+    double pivot_value = point_get_coord(pivot, axis);
+    point_swap(pivot, last);
 
-    int partition_idx = slice->start;
-    for (int i = slice->start; i < last_idx; ++i) {
-        if (point_get_coord(points + i, axis) < pivot) {
-            if (partition_idx != i) {
-                point_swap(points + i, points + partition_idx);
+    Point *partition = slice->start;
+    for (Point *point = partition; point < last; ++point) {
+        if (point_get_coord(point, axis) < pivot_value) {
+            if (partition != point) {
+                point_swap(point, partition);
             }
-            ++partition_idx;
+            ++partition;
         }
     }
 
-    point_swap(points + last_idx, points + partition_idx);
-    return partition_idx;
+    point_swap(last, partition);
+    return partition;
 }
 
-static int ptslc_quickselect(
-    PointSlice *slice,
-    int partition_idx,
-    enum Axis axis
-) {
+static Point *ptslc_quickselect(PointSlice *slice, Point *partition, enum Axis axis) {
     if (slice->start < slice->end) {
-        int pivot_idx = (slice->start + slice->end) / 2;
-        pivot_idx = ptslc_partition(slice, pivot_idx, axis);
+        long pivot_offset = (slice->end - slice->start) / 2;
+        Point *pivot = slice->start + pivot_offset;
+        pivot = ptslc_partition(slice, pivot, axis);
 
         // case: the paritioning element falls into the lower value range
-        if (pivot_idx < partition_idx) {
+        if (pivot < partition) {
             PointSlice subslice = {
-                .start = pivot_idx + 1,
+                .start = pivot + 1,
                 .end = slice->end,
-                .points = slice->points,
             };
-            pivot_idx = ptslc_quickselect(&subslice, partition_idx, axis);
+            pivot = ptslc_quickselect(&subslice, partition, axis);
         }
         
         // case: the paritioning element falls into the higher value range
-        else if (pivot_idx > partition_idx) {
+        else if (pivot > partition) {
             PointSlice subslice = {
                 .start = slice->start,
-                .end = pivot_idx,
-                .points = slice->points,
+                .end = pivot,
             };
-            pivot_idx = ptslc_quickselect(&subslice, partition_idx, axis);
+            pivot = ptslc_quickselect(&subslice, partition, axis);
         }
 
-        return pivot_idx;
+        return pivot;
     }
-    return -1;
+    return NULL;
 }
 
-static int ptslc_partition_maxspread_axis(PointSlice *slice) {
+static Point *ptslc_partition_maxspread_axis(PointSlice *slice) {
     enum Axis split_axis = ptslc_get_maxspread_axis(slice);
-    int median_idx = (slice->end + slice->start) / 2;
-    return ptslc_quickselect(slice, median_idx, split_axis);
+    long median_offset = (slice->end - slice->start) / 2;
+    Point *median = slice->start + median_offset;
+    median = ptslc_quickselect(slice, median, split_axis);
+    if (median == NULL) {
+        EMIT_ERR_MSG(ValueError, "could not determine median element for partitioning");
+    }
+    return median;
 }
 
-static BallNode *bnode_init(PointBuffer *buffer, int start, int end) {
-    BallNode *node = (BallNode *)calloc(1, sizeof(BallNode));
+BallNode *bnode_build(PointSlice *slice, int leafsize) {
+    long num_points = ptslc_get_size(slice);
+
+    BallNode *node = calloc(1, sizeof(BallNode));
     if (node == NULL) {
         EMIT_ERR_MSG(MemoryError, "BallTree node allocation failed");
         return NULL;
     }
-
-    node->data = (PointSlice){
-        .start = start,
-        .end = end,
-        .points = buffer->points,
-    };
-    node->center = ptslc_get_mean(&node->data);
-    node->radius = ptslc_get_maxdist(&node->data, &node->center);
-    // remaining member default to 0.0 or NULL
-    return node;
-}
-
-BallNode *bnode_build(PointBuffer *buffer, int start, int end, int leafsize) {
-    BallNode *node = bnode_init(buffer, start, end);
-    if (node == NULL) {
-        return NULL;
-    }
+    node->ball = ball_from_ptslc(slice);
 
     // case: leaf node
-    if (end - start <= leafsize) {
-        node->sum_weight = ptslc_sum_weights(&node->data);
+    if (num_points <= leafsize) {
+        node->data = *slice;
+        node->is_leaf = 1;
+        node->num_points = num_points;
+        node->sum_weight = ptslc_sum_weights(slice);
     }
 
     // case: regular node with childs    
     else {
         // partition points at median of axis with max. value range (split-axis)
-        int split_idx = ptslc_partition_maxspread_axis(&node->data);
-        if (split_idx == -1) {
-            EMIT_ERR_MSG(ValueError, "could not determine median element for partitioning");
-            bnode_free(node);
-            return NULL;
+        Point *split = ptslc_partition_maxspread_axis(slice);
+        if (split == NULL) {
+            goto error;
         }
+        PointSlice child_slice;
 
         // create left child from set points of with lower split-axis values
-        node->left = bnode_build(buffer, start, split_idx, leafsize);
-        if (node->left == NULL) {
-            bnode_free(node);
-            return NULL;
+        child_slice.start = slice->start;
+        child_slice.end = split;
+        node->childs.left = bnode_build(&child_slice, leafsize);
+        if (node->childs.left == NULL) {
+            goto error;
         }
 
         // create right child from set of points with larger split-axis values
-        node->right = bnode_build(buffer, split_idx, end, leafsize);
-        if (node->right == NULL) {
-            bnode_free(node);
-            return NULL;
+        child_slice.start = split;
+        child_slice.end = slice->end;
+        node->childs.right = bnode_build(&child_slice, leafsize);
+        if (node->childs.right == NULL) {
+            goto error;
         }
 
-        // use weights computed further down in the leaf nodes
-        node->sum_weight = node->left->sum_weight + node->right->sum_weight;
+        // use number of points and weights computed further down in the leaf nodes
+        node->is_leaf = 0;
+        node->num_points = node->childs.left->num_points +
+                           node->childs.right->num_points;
+        node->sum_weight = node->childs.left->sum_weight +
+                           node->childs.right->sum_weight;
     }
     return node;
+
+error:
+    bnode_free(node);
+    return NULL;
 }
 
 void bnode_free(BallNode *node) {
-    if (node->left != NULL) {
-        bnode_free(node->left);
-    }
-    if (node->right != NULL) {
-        bnode_free(node->right);
+    if (BALLNODE_IS_LEAF(node)) {
+        bnode_free(node->childs.left);
+        bnode_free(node->childs.right);
     }
     free(node);
 }
 
 int bnode_is_leaf(const BallNode *node) {
-    // leaf nodes have no childs
-    return (node->left == NULL && node->right == NULL) ? true : false;
+    return BALLNODE_IS_LEAF(node);
+}
+
+PointSlice bnode_get_ptslc(const BallNode *node) {
+    if (BALLNODE_IS_LEAF(node)) {
+        return node->data;
+    } else {
+        PointSlice left = bnode_get_ptslc(node->childs.left);
+        PointSlice right = bnode_get_ptslc(node->childs.right);
+        return (PointSlice){
+            .start = left.start,
+            .end = right.end,
+        };
+    }
 }

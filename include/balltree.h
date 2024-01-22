@@ -10,6 +10,7 @@ typedef struct {
     BallNode *root;
     PointBuffer data;
     int leafsize;
+    int data_owned;
 } BallTree;
 
 // from balltree.c
@@ -23,7 +24,7 @@ double balltree_count_range(const BallTree *, const Point *, double, double);
 double balltree_dualcount_radius(const BallTree *, const BallTree *, double);
 double balltree_dualcount_range(const BallTree *, const BallTree *, double, double);
 
-int balltree_count_nodes(const BallTree *);
+long balltree_count_nodes(const BallTree *);
 StatsVector *balltree_collect_stats(const BallTree *);
 
 // from balltree_serialize.c

@@ -15,38 +15,48 @@ BallTree *balltree_build_leafsize(const PointBuffer *buffer, int leafsize) {
     if (data == NULL) {
         return NULL;
     }
-    return balltree_build_nocopy(data, leafsize);
+
+    BallTree *tree = balltree_build_nocopy(data, leafsize);
+    if (tree == NULL) {
+        ptbuf_free(data);
+        return NULL;
+    }
+    tree->data_owned = 1;
+    return tree;
 }
 
 BallTree *balltree_build_nocopy(PointBuffer *buffer, int leafsize) {
-    int size = buffer->size;
+    long size = buffer->size;
     if (size < 1) {
         EMIT_ERR_MSG(ValueError, "need at least one input data point to build a tree");
         return NULL;
     }
 
-    BallTree *tree = (BallTree*)malloc(sizeof(BallTree));
+    BallTree *tree = malloc(sizeof(BallTree));
     if (tree == NULL) {
         EMIT_ERR_MSG(MemoryError, "BallTree root allocation failed");
         return NULL;
     }
     tree->leafsize = leafsize;
+    tree->data_owned = 0;
+    tree->data = *buffer;
 
-    PointBuffer *data = ptbuf_copy(buffer);
-    if (data == NULL) {
-        balltree_free(tree);
-        return NULL;
+    PointSlice *slice = ptslc_from_buffer(buffer);
+    if (slice == NULL) {
+        goto error;
     }
-    tree->data = *data;
-
-    BallNode *root = bnode_build(data, 0, size, leafsize);
+    BallNode *root = bnode_build(slice, leafsize);
     if (root == NULL) {
-        balltree_free(tree);
-        return NULL;
+        free(slice);
+        goto error;
     }
     tree->root = root;
 
     return tree;
+
+error:
+    balltree_free(tree);
+    return NULL;
 }
 
 void balltree_free(BallTree *tree) {
@@ -59,7 +69,7 @@ void balltree_free(BallTree *tree) {
     free(tree);
 }
 
-int balltree_count_nodes(const BallTree *tree) {
+long balltree_count_nodes(const BallTree *tree) {
     return bnode_count_nodes(tree->root);
 }
 
@@ -98,7 +108,7 @@ double balltree_dualcount_range(
 }
 
 StatsVector *balltree_collect_stats(const BallTree *tree) {
-    int num_nodes = balltree_count_nodes(tree);
+    long num_nodes = balltree_count_nodes(tree);
     StatsVector *vec = statvec_new_reserve(num_nodes);
     if (vec == NULL) {
         return NULL;

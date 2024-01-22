@@ -1,6 +1,14 @@
 #ifndef POINT_H
 #define POINT_H
 
+#define EUCLIDEAN_DIST_SQ(p1, p2) \
+    ({ \
+        double __dx = (p1)->x - (p2)->x; \
+        double __dy = (p1)->y - (p2)->y; \
+        double __dz = (p1)->z - (p2)->z; \
+        __dx * __dx + __dy * __dy + __dz * __dz; \
+    })
+
 enum Axis {X, Y, Z};
 
 typedef struct {
@@ -11,14 +19,13 @@ typedef struct {
 } Point;
 
 typedef struct {
-    int size;
     Point *points;
+    long size;
 } PointBuffer;
 
 typedef struct {
-    int start;
-    int end;
-    Point *points;
+    Point *start;
+    Point *end;
 } PointSlice;
 
 // from point.c
@@ -28,15 +35,15 @@ double point_dist(const Point *, const Point *);
 double point_dist_sq(const Point *, const Point *);
 
 // from pointbuffers.c
-PointBuffer *ptbuf_new(int);
-PointBuffer *ptbuf_from_buffers(int, double *, double *, double *);
-PointBuffer *ptbuf_from_buffers_weighted(int, double *, double *, double *, double *);
+PointBuffer *ptbuf_new(long);
+PointBuffer *ptbuf_from_buffers(long, double *, double *, double *);
+PointBuffer *ptbuf_from_buffers_weighted(long, double *, double *, double *, double *);
 void ptbuf_free(PointBuffer *);
-int ptbuf_resize(PointBuffer *, int);
+int ptbuf_resize(PointBuffer *, long);
 PointBuffer *ptbuf_copy(const PointBuffer *);
-PointBuffer *ptbuf_gen_random(double, double, int);
+PointBuffer *ptbuf_gen_random(double, double, long);
 
 PointSlice *ptslc_from_buffer(const PointBuffer *);
-int ptslc_get_size(const PointSlice *);
+long ptslc_get_size(const PointSlice *);
 
 #endif /* POINT_H */
