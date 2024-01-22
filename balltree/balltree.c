@@ -512,7 +512,7 @@ static PyObject *PyBallTree_str(PyBallTree *self) {
     int n_bytes = snprintf(
         buffer,
         sizeof(buffer),
-        "PyBallTree(num_data=%d, radius=%.3f, center={%+.3f, %+.3f, %+.3f})",
+        "BallTree(num_data=%d, radius=%.3f, center={%+.3f, %+.3f, %+.3f})",
         tree->data.size,
         node->ball.radius,
         node->ball.x,

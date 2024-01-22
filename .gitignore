@@ -1,3 +1,5 @@
+pyexample.c
+
 # cython generated source files
 cython/*.c
 
