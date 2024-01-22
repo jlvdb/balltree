@@ -1,7 +1,20 @@
-[ ] Implement a priority queue with a min-heap in C, where the priority is the distance and the data a Point
-[ ] Implement k-nearest neighbour searching, with optional distance truncation
-[ ] Implement a single method for python that can query one point or multiple points, switching automatically to dualtree
-[ ] Add the doc strings with PyDoc_STRVAR and alikes
-[ ] Clean up the python code with concepts from the example.c file
-[ ] Implement new constructors that build the tree from (ra, dec) coordinates
-[ ] Implement new query routines that take (ra, dec) points and the search radius in radians
+# Development Plans
+
+## Fixes
+
+- Implement a single method for python that can query one point or multiple
+  points, switching automatically to dualtree
+- Clean up the python code with concepts from the example.c file
+- Add the doc strings with PyDoc_STRVAR and alikes
+
+## New features
+
+- Add support for angular coordinates
+    - Implement new constructors that build the tree from (ra, dec) coordinates
+    - Implement new query routines that take (ra, dec) points and search within
+      a radius given in radians
+- Implement k-nearest neighbour searching, with optional distance truncation
+    - Implement a priority queue with a min-heap in C, where the priority is the
+      distance and the data a Point
+    - Maybe add an index tracking array that maps back to the sort order of the
+      inputs, which would allow returning the indices instead of the Points
