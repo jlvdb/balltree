@@ -42,6 +42,8 @@ static PyObject *PyBallTree_to_file(PyBallTree *self, PyObject *args);
 static PyObject *PyBallTree_count_nodes(PyBallTree *self);
 static PyObject *PyBallTree_get_node_data(PyBallTree *self);
 static PyObject *PyBallTree_count_radius(PyBallTree *self, PyObject *args, PyObject *kwargs);
+static PyObject *PyBallTree_multicount_radius(PyBallTree *self, PyObject *args, PyObject *kwargs);
+static PyObject *PyBallTree_autocount_radius(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_count_range(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_dualcount_radius(PyBallTree *self, PyObject *args);
 static PyObject *PyBallTree_dualcount_range(PyBallTree *self, PyObject *args);
@@ -596,6 +598,129 @@ static PyObject *PyBallTree_count_radius(
     return PyFloat_FromDouble(count);
 }
 
+static PyObject *PyBallTree_multicount_radius(
+    PyBallTree *self,
+    PyObject *args,
+    PyObject *kwargs
+) {
+    static char *kwlist[] = {"x", "y", "z", "radius", "weight", NULL};
+    PyObject *x_obj, *y_obj, *z_obj;
+    double radius;
+    PyObject *weight_obj = Py_None;
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, "OOOd|O", kwlist,
+            &x_obj, &y_obj, &z_obj, &radius, &weight_obj)
+    ) {
+        return NULL;
+    }
+    int weights_provided = weight_obj != Py_None;
+
+    // check the input data and create a numpy array with ones if weight is None
+    npy_intp size = check_arrays_dtype_shape(x_obj, y_obj, z_obj, weight_obj);
+    if (size == -1) {
+        return NULL;
+    }
+    if (size == 0) {
+        PyErr_SetString(PyExc_ValueError, "need at least one data point");
+        return NULL;
+    }
+    if (!weights_provided) {
+        weight_obj = numpy_ones_1dim(size);
+    }
+
+    PointBuffer *buffer = ptbuf_from_numpy_array(
+        (PyArrayObject *)x_obj,
+        (PyArrayObject *)y_obj,
+        (PyArrayObject *)z_obj,
+        (PyArrayObject *)weight_obj
+    );
+    if (!weights_provided) {
+        Py_DECREF(&weight_obj);
+    }
+    if (buffer == NULL) {
+        return NULL;
+    }
+
+    double count = 0.0;
+    Point *points = buffer->points;
+    BallTree *tree = self->balltree;
+    for (int i = 0; i < buffer->size; ++i) {
+        Point *point = points + i;
+        count += point->weight * balltree_count_radius(tree, point, radius);
+    }
+    ptbuf_free(buffer);
+    return PyFloat_FromDouble(count);
+}
+
+static PyObject *PyBallTree_autocount_radius(
+    PyBallTree *self,
+    PyObject *args,
+    PyObject *kwargs
+) {
+    static char *kwlist[] = {"x", "y", "z", "radius", "weight", NULL};
+    PyObject *x_obj, *y_obj, *z_obj;
+    double radius;
+    PyObject *weight_obj = Py_None;
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, "OOOd|O", kwlist,
+            &x_obj, &y_obj, &z_obj, &radius, &weight_obj)
+    ) {
+        return NULL;
+    }
+    int weights_provided = weight_obj != Py_None;
+
+    // check the input data and create a numpy array with ones if weight is None
+    npy_intp size = check_arrays_dtype_shape(x_obj, y_obj, z_obj, weight_obj);
+    if (size == -1) {
+        return NULL;
+    }
+    if (size == 0) {
+        PyErr_SetString(PyExc_ValueError, "need at least one data point");
+        return NULL;
+    }
+    if (!weights_provided) {
+        weight_obj = numpy_ones_1dim(size);
+    }
+
+    PointBuffer *buffer = ptbuf_from_numpy_array(
+        (PyArrayObject *)x_obj,
+        (PyArrayObject *)y_obj,
+        (PyArrayObject *)z_obj,
+        (PyArrayObject *)weight_obj
+    );
+    if (!weights_provided) {
+        Py_DECREF(&weight_obj);
+    }
+    if (buffer == NULL) {
+        return NULL;
+    }
+
+    double count = 0.0;
+
+    // case: iterate points
+    if (buffer->size < 100000) {
+        Point *points = buffer->points;
+        BallTree *tree = self->balltree;
+        for (int i = 0; i < buffer->size; ++i) {
+            Point *point = points + i;
+            count += point->weight * balltree_count_radius(tree, point, radius);
+        }
+    }
+    
+    // case: build second tree for dualtree algorithm
+    else {
+        BallTree *other = balltree_build(buffer);
+        if (other == NULL) {
+            return NULL;
+        }
+        count = balltree_dualcount_radius(self->balltree, other, radius);
+        balltree_free(other);
+    }
+
+    ptbuf_free(buffer);
+    return PyFloat_FromDouble(count);
+}
+
 static PyObject *PyBallTree_count_range(
     PyBallTree *self,
     PyObject *args,
@@ -728,6 +853,18 @@ static PyMethodDef PyBallTree_methods[] = {
         .ml_doc = "Count pairs within a radius"
     },
     {
+        .ml_name = "multicount_radius",
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_multicount_radius,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Count pairs within a radius"
+    },
+    {
+        .ml_name = "autocount_radius",
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_autocount_radius,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Count pairs within a radius"
+    },
+    {
         .ml_name = "count_range",
         .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_range,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
@@ -767,12 +904,12 @@ static PyTypeObject PyBallTreeType = {
 
 static struct PyModuleDef pyballtree = {
     PyModuleDef_HEAD_INIT,
-    .m_name = "balltree",
+    .m_name = "balltree._balltree",
     .m_doc = "Fast balltree implementation",
     .m_size = -1,
 };
 
-PyMODINIT_FUNC PyInit_balltree(void) {
+PyMODINIT_FUNC PyInit__balltree(void) {
     if (PyType_Ready(&PyBallTreeType) < 0) {
         return NULL;
     }

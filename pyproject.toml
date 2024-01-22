@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "balltree"
-version = "0.1"
+dynamic = ["version"]
 authors = [
     {name = "Jan Luca van den Busch", email = "jlvdb@astro.ruhr-uni-bochum.de"},
 ]
@@ -21,3 +21,9 @@ requires-python = ">=3"
 dependencies = [
     "numpy",
 ]
+
+[tool.setuptools.dynamic]
+version = {attr = "balltree.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["."]

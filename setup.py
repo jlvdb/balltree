@@ -1,10 +1,10 @@
 from setuptools import setup, Extension
 import numpy as np
 
-ext_module = Extension(
-    name="balltree",
+balltree = Extension(
+    name="balltree._balltree",
     sources=[
-        "python/balltree_wrapper.c",
+        "balltree/balltree.c",
         "src/point.c",
         "src/pointbuffers.c",
         "src/ballnode.c",
@@ -25,6 +25,6 @@ ext_module = Extension(
 
 if __name__ == "__main__":
     setup(
-        ext_modules=[ext_module],
+        ext_modules=[balltree],
         url="https://github.com/jlvdb/balltree.git",
     )

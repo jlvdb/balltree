@@ -1,0 +1,6 @@
+[ ] Implement a priority queue with a min-heap in C, where the priority is the distance and the data a Point
+[ ] Implement k-nearest neighbour searching, with optional distance truncation
+[ ] Implement a single method for python that can query one point or multiple points, switching automatically to dualtree
+[ ] Clean up the python code with concepts from the example.c file
+[ ] Implement new constructors that build the tree from (ra, dec) coordinates
+[ ] Implement new query routines that take (ra, dec) points and the search radius in radians
