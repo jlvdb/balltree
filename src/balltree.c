@@ -18,6 +18,7 @@ BallTree *balltree_build_leafsize(const PointBuffer *buffer, int leafsize) {
 
     BallTree *tree = balltree_build_nocopy(data, leafsize);
     if (tree == NULL) {
+        ptbuf_free(data);
         return NULL;
     }
     tree->data_owned = 1;
@@ -42,17 +43,20 @@ BallTree *balltree_build_nocopy(PointBuffer *buffer, int leafsize) {
 
     PointSlice *slice = ptslc_from_buffer(buffer);
     if (slice == NULL) {
-        balltree_free(tree);
-        return NULL;
+        goto error;
     }
     BallNode *root = bnode_build(slice, leafsize);
     if (root == NULL) {
-        balltree_free(tree);
-        return NULL;
+        free(slice);
+        goto error;
     }
     tree->root = root;
 
     return tree;
+
+error:
+    balltree_free(tree);
+    return NULL;
 }
 
 void balltree_free(BallTree *tree) {

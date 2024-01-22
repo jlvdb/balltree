@@ -77,7 +77,7 @@ static Point *PyIter_to_point(PyObject *coord_iter, double weight) {
     }
 
     // create the point instance from the python sequence
-    Point *point = (Point *)malloc(sizeof(Point));
+    Point *point = malloc(sizeof(Point));
     if (point == NULL) {
         PyErr_SetString(PyExc_MemoryError, "failed to allocate Point");
         goto fail;
@@ -297,7 +297,8 @@ static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
 
 static PyObject *statvec_get_numpy_array(StatsVector *vec) {
     const npy_intp ndim = 1;
-    npy_intp shape[1] = {vec->end};
+    const size_t size = vec->end - vec->stats;
+    npy_intp shape[1] = {size};
 
     // construct an appropriate dtype for StatsVector
     PyObject *arr_dtype = Py_BuildValue(
@@ -329,7 +330,7 @@ static PyObject *statvec_get_numpy_array(StatsVector *vec) {
         return NULL;
     }
     void *ptr = PyArray_DATA(array);
-    memcpy(ptr, vec->stats, sizeof(NodeStats) * vec->end);
+    memcpy(ptr, vec->stats, sizeof(NodeStats) * size);
     return array;
 }
 
@@ -488,14 +489,14 @@ static PyObject *PyBallTree_get_sum_weight(PyBallTree *self, void *closure) {
 static PyObject *PyBallTree_get_center(PyBallTree *self, void *closure) {
     return PyTuple_Pack(
         3,
-        PyFloat_FromDouble(self->balltree->root->center.x),
-        PyFloat_FromDouble(self->balltree->root->center.y),
-        PyFloat_FromDouble(self->balltree->root->center.z)
+        PyFloat_FromDouble(self->balltree->root->ball.x),
+        PyFloat_FromDouble(self->balltree->root->ball.y),
+        PyFloat_FromDouble(self->balltree->root->ball.z)
     );
 }
 
 static PyObject *PyBallTree_get_radius(PyBallTree *self, void *closure) {
-    return PyFloat_FromDouble(self->balltree->root->radius);
+    return PyFloat_FromDouble(self->balltree->root->ball.radius);
 }
 
 // PyBallTree: method implementations //////////////////////////////////////////
@@ -511,10 +512,10 @@ static PyObject *PyBallTree_str(PyBallTree *self) {
         sizeof(buffer),
         "PyBallTree(num_data=%d, radius=%.3f, center={%+.3f, %+.3f, %+.3f})",
         tree->data.size,
-        node->radius,
-        node->center.x,
-        node->center.y,
-        node->center.z
+        node->ball.radius,
+        node->ball.x,
+        node->ball.y,
+        node->ball.z
     );
     if (n_bytes < 0 || n_bytes >= (int)sizeof(buffer)) {
         PyErr_SetString(PyExc_RuntimeError, "failed to format the string");

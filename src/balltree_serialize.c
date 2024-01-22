@@ -73,14 +73,14 @@ static BNodeBuffer *bnodebuffer_new(long size) {
         return NULL;
     }
 
-    nodebuffer->size = size;
-    nodebuffer->next_free = 0L;
     nodebuffer->nodes = malloc(size * sizeof(BallNode));
     if (nodebuffer->nodes == NULL) {
         EMIT_ERR_MSG(MemoryError, "failed to allocate BNodeBuffer buffer");
         bnodebuffer_free(nodebuffer);
         return NULL;
     }
+    nodebuffer->size = size;
+    nodebuffer->next_free = 0L;
     return nodebuffer;
 }
 
@@ -88,6 +88,7 @@ static void bnodebuffer_free(BNodeBuffer *buffer) {
     if (buffer->nodes != NULL) {
         free(buffer->nodes);
     }
+    free(buffer);
 }
 
 static size_t bnodebuffer_get_next_free(BNodeBuffer *buffer) {
@@ -183,10 +184,8 @@ static int bnode_serialise(
     if (BALLNODE_IS_LEAF(node)) {
         // replace pointers to slice start/end by index into point data buffer,
         // see bnode_deserialise()
-        size_t start_idx = node->data.start - points;
-        size_t end_idx = node->data.end - points;
-        stored->data.start = (Point *)start_idx;
-        stored->data.end = (Point *)end_idx;
+        stored->data.start = (Point *)(node->data.start - points);
+        stored->data.end = (Point *)(node->data.end - points);
     } else {
         // replace pointers to childs by index in buffer they will be stored at
         size_t left_idx = bnodebuffer_get_next_free(buffer);
@@ -206,10 +205,12 @@ static int bnode_serialise(
 }
 
 int balltree_to_file(const BallTree *tree, const char *path) {
+    int return_value = BTR_FAILED;
+
     FILE *file = fopen(path, "wb");
     if (file == NULL) {
         EMIT_ERR_MSG(OSError, "failed to open file: %s", path);
-        return BTR_FAILED;
+        goto error;
     }
 
     // create the file header and write it to the file
@@ -231,30 +232,29 @@ int balltree_to_file(const BallTree *tree, const char *path) {
     if (nodebuffer == NULL) {
         goto err_dealloc_header;
     }
-    free(header);
     size_t root_index = bnodebuffer_get_next_free(nodebuffer);
     if (bnode_serialise(tree->root, nodebuffer, root_index, tree->data.points) == BTR_FAILED) {
-        bnodebuffer_free(nodebuffer);
-        goto err_close_file;
+        goto err_dealloc_bnodebuffer;
     }
     if (bnodebuffer_write(nodebuffer, file) == BTR_FAILED) {
-        bnodebuffer_free(nodebuffer);
-        goto err_close_file;
+        goto err_dealloc_bnodebuffer;
     }
 
-    bnodebuffer_free(nodebuffer);
     if (fflush(file) == EOF) {
         EMIT_ERR_MSG(IOError, "failed to flush file");
-        goto err_close_file;
+        goto err_dealloc_bnodebuffer;
     }
-    fclose(file);
-    return BTR_SUCCESS;
 
+    return_value = BTR_SUCCESS;
+
+err_dealloc_bnodebuffer:
+    bnodebuffer_free(nodebuffer);
 err_dealloc_header:
     free(header);
 err_close_file:
     fclose(file);
-    return BTR_FAILED;
+error:
+    return return_value;
 }
 
 static BallNode *bnode_deserialise(
@@ -279,10 +279,8 @@ static BallNode *bnode_deserialise(
     if (BALLNODE_IS_LEAF(node)) {
         // restore pointers to slice start/end from their index into the point
         // data buffer, see bnode_serialise()
-        size_t start_idx = (size_t)node->data.start;
-        size_t end_idx = (size_t)node->data.end;
-        node->data.start = points + start_idx;
-        node->data.end = points + end_idx;
+        node->data.start = points + (size_t)node->data.start;
+        node->data.end = points + (size_t)node->data.end;
     } else {
         // restore child instances from their index into node buffer
         size_t left_idx = (size_t)node->childs.left;
@@ -303,16 +301,12 @@ static BallNode *bnode_deserialise(
 }
 
 BallTree* balltree_from_file(const char *path) {
-    BallTree *tree = malloc(sizeof(BallTree));
-    if (tree == NULL) {
-        EMIT_ERR_MSG(MemoryError, "failed to allocate BallTree");
-        return NULL;
-    }
+    BallTree *tree = NULL;  // return value
 
     FILE *file = fopen(path, "rb");
     if (file == NULL) {
         EMIT_ERR_MSG(OSError, "failed to open file: %s", path);
-        goto err_dealloc_tree;
+        goto error;
     }
 
     // read header from the file
@@ -320,37 +314,47 @@ BallTree* balltree_from_file(const char *path) {
     if (header == NULL) {
         goto err_close_file;
     }
-    tree->leafsize = header->leafsize;
-    tree->data_owned = 1;  // after deserialising, the buffer from the file is used
 
     // read tree's data points from the file
     PointBuffer *points = ptbuf_read(header->points.n_items, file);
     if (points == NULL) {
         goto err_dealloc_header;
     }
-    tree->data = *points;  // move ownership of underlying point buffer
-    free(points);
 
     // read the tree nodes from the file and deserialise them
     BNodeBuffer *nodebuffer = bnodebuffer_read(header->nodes.n_items, file);
     if (nodebuffer == NULL) {
-        goto err_dealloc_header;  // points deallocated at err_dealloc_tree
+        goto err_dealloc_points;
     }
-    tree->root = bnode_deserialise(nodebuffer, 0L, tree->data.points);
+    BallNode *root = bnode_deserialise(nodebuffer, 0L, points->points);
+    if (root == NULL) {
+        goto err_dealloc_bnodebuffer;
+    }
+    
+    tree = malloc(sizeof(BallTree));
+    if (tree == NULL) {
+        EMIT_ERR_MSG(MemoryError, "failed to allocate BallTree");
+        goto err_dealloc_root;
+    }
+    tree->leafsize = header->leafsize;
+    tree->data_owned = 1;  // after deserialising, the buffer from the file is used
+    tree->data = *points;  // move ownership of underlying point buffer
+    tree->root = root;
+
+err_dealloc_root:
+    if (tree == NULL) {
+        bnode_free(root);
+    }
+err_dealloc_bnodebuffer:
     bnodebuffer_free(nodebuffer);
-    if (tree->root == NULL) {
-        goto err_dealloc_header;  // nodes deallocated at err_dealloc_tree
+err_dealloc_points:
+    if (tree == NULL) {
+        free(points);
     }
-
-    free(header);
-    fclose(file);
-    return tree;
-
 err_dealloc_header:
     free(header);
 err_close_file:
     fclose(file);
-err_dealloc_tree:
-    balltree_free(tree);
-    return NULL;
+error:
+    return tree;
 }

@@ -172,7 +172,11 @@ static Point *ptslc_partition_maxspread_axis(PointSlice *slice) {
     enum Axis split_axis = ptslc_get_maxspread_axis(slice);
     long median_offset = (slice->end - slice->start) / 2;
     Point *median = slice->start + median_offset;
-    return ptslc_quickselect(slice, median, split_axis);
+    median = ptslc_quickselect(slice, median, split_axis);
+    if (median == NULL) {
+        EMIT_ERR_MSG(ValueError, "could not determine median element for partitioning");
+    }
+    return median;
 }
 
 BallNode *bnode_build(PointSlice *slice, int leafsize) {
@@ -188,7 +192,6 @@ BallNode *bnode_build(PointSlice *slice, int leafsize) {
     // case: leaf node
     if (num_points <= leafsize) {
         node->data = *slice;
-
         node->is_leaf = 1;
         node->num_points = num_points;
         node->sum_weight = ptslc_sum_weights(slice);
@@ -199,9 +202,7 @@ BallNode *bnode_build(PointSlice *slice, int leafsize) {
         // partition points at median of axis with max. value range (split-axis)
         Point *split = ptslc_partition_maxspread_axis(slice);
         if (split == NULL) {
-            EMIT_ERR_MSG(ValueError, "could not determine median element for partitioning");
-            bnode_free(node);
-            return NULL;
+            goto error;
         }
         PointSlice child_slice;
 
@@ -210,8 +211,7 @@ BallNode *bnode_build(PointSlice *slice, int leafsize) {
         child_slice.end = split;
         node->childs.left = bnode_build(&child_slice, leafsize);
         if (node->childs.left == NULL) {
-            bnode_free(node);
-            return NULL;
+            goto error;
         }
 
         // create right child from set of points with larger split-axis values
@@ -219,8 +219,7 @@ BallNode *bnode_build(PointSlice *slice, int leafsize) {
         child_slice.end = slice->end;
         node->childs.right = bnode_build(&child_slice, leafsize);
         if (node->childs.right == NULL) {
-            bnode_free(node);
-            return NULL;
+            goto error;
         }
 
         // use number of points and weights computed further down in the leaf nodes
@@ -231,6 +230,10 @@ BallNode *bnode_build(PointSlice *slice, int leafsize) {
                            node->childs.right->sum_weight;
     }
     return node;
+
+error:
+    bnode_free(node);
+    return NULL;
 }
 
 void bnode_free(BallNode *node) {
