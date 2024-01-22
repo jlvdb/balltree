@@ -3,10 +3,10 @@
 
 #define EUCLIDEAN_DIST_SQ(p1, p2) \
     ({ \
-        double dx = (p1)->x - (p2)->x; \
-        double dy = (p1)->y - (p2)->y; \
-        double dz = (p1)->z - (p2)->z; \
-        dx * dx + dy * dy + dz * dz; \
+        double __dx = (p1)->x - (p2)->x; \
+        double __dy = (p1)->y - (p2)->y; \
+        double __dz = (p1)->z - (p2)->z; \
+        __dx * __dx + __dy * __dy + __dz * __dz; \
     })
 
 enum Axis {X, Y, Z};
@@ -24,9 +24,8 @@ typedef struct {
 } PointBuffer;
 
 typedef struct {
-    Point *points;
-    int start;
-    int end;
+    Point *start;
+    Point *end;
 } PointSlice;
 
 // from point.c

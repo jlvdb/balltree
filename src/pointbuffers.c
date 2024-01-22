@@ -130,9 +130,8 @@ PointSlice *ptslc_from_buffer(const PointBuffer *buffer) {
         return NULL;
     }
 
-    slice->start = 0;
-    slice->end = buffer->size;
-    slice->points = buffer->points;
+    slice->start = buffer->points;
+    slice->end = buffer->points + buffer->size;
     return slice;
 }
 

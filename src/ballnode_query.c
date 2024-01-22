@@ -6,43 +6,39 @@
 #include "ballnode.h"
 #include "balltree_macros.h"
 
-static double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *point, double rad_sq);
-static double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *point, double rmin_sq, double rmax_sq);
+static double ptslc_sumw_in_radius_sq(const PointSlice *slice, const Point *ref_point, double rad_sq);
+static double ptslc_sumw_in_range_sq(const PointSlice *slice, const Point *ref_point, double rmin_sq, double rmax_sq);
 static double ptslc_dualsumw_in_radius_sq(const PointSlice *slice1, const PointSlice *slice2, double rad_sq);
 static double ptslc_dualsumw_in_range_sq(const PointSlice *slice1, const PointSlice *slice2, double rmin_sq, double rmax_sq);
 
 
 static double ptslc_sumw_in_radius_sq(
     const PointSlice *slice,
-    const Point *point,
+    const Point *ref_point,
     double rad_sq
 ) {
     double sumw = 0.0;
-    Point *points = slice->points;
-    for (int i = slice->start; i < slice->end; ++i) {
-        Point *point_i = points + i;
-        double dist_sq = EUCLIDEAN_DIST_SQ(point_i, point);
+    for (const Point *point = slice->start; point < slice->end; ++point) {
+        double dist_sq = EUCLIDEAN_DIST_SQ(ref_point, point);
         // add point weight if condition is met otherwise zero
         int dist_mask = dist_sq <= rad_sq;
-        sumw += point_i->weight * (double)dist_mask;
+        sumw += point->weight * (double)dist_mask;
     }
     return sumw;
 }
 
 static double ptslc_sumw_in_range_sq(
     const PointSlice *slice,
-    const Point *point,
+    const Point *ref_point,
     double rmin_sq,
     double rmax_sq
 ) {
     double sumw = 0.0;
-    Point *points = slice->points;
-    for (int i = slice->start; i < slice->end; ++i) {
-        Point *point_i = points + i;
-        double dist_sq = EUCLIDEAN_DIST_SQ(point_i, point);
+    for (const Point *point = slice->start; point < slice->end; ++point) {
+        double dist_sq = EUCLIDEAN_DIST_SQ(ref_point, point);
         // add point weight if condition is met otherwise zero
         int dist_mask = rmin_sq < dist_sq || dist_sq <= rmax_sq;
-        sumw += point_i->weight * (double)dist_mask;
+        sumw += point->weight * (double)dist_mask;
     }
     return sumw;
 }
@@ -53,10 +49,8 @@ static double ptslc_dualsumw_in_radius_sq(
     double rad_sq
 ) {
     double sumw = 0.0;
-    Point *points1 = slice1->points;
-    for (int i = slice1->start; i < slice1->end; ++i) {
-        Point *pt1 = points1 + i;
-        sumw += pt1->weight * ptslc_sumw_in_radius_sq(slice2, pt1, rad_sq);
+    for (const Point *point = slice1->start; point < slice1->end; ++point) {
+        sumw += point->weight * ptslc_sumw_in_radius_sq(slice2, point, rad_sq);
     }
     return sumw;
 }
@@ -68,10 +62,8 @@ static double ptslc_dualsumw_in_range_sq(
     double rmax_sq
 ) {
     double sumw = 0.0;
-    Point *points1 = slice1->points;
-    for (int i = slice1->start; i < slice1->end; ++i) {
-        Point *pt1 = points1 + i;
-        sumw += pt1->weight * ptslc_sumw_in_range_sq(slice2, pt1, rmin_sq, rmax_sq);
+    for (const Point *point = slice1->start; point < slice1->end; ++point) {
+        sumw += point->weight * ptslc_sumw_in_range_sq(slice2, point, rmin_sq, rmax_sq);
     }
     return sumw;
 }
