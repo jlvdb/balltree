@@ -178,7 +178,7 @@ static Point *ptslc_partition_maxspread_axis(PointSlice *slice) {
 BallNode *bnode_build(PointSlice *slice, int leafsize) {
     long num_points = ptslc_get_size(slice);
 
-    BallNode *node = (BallNode *)calloc(1, sizeof(BallNode));
+    BallNode *node = calloc(1, sizeof(BallNode));
     if (node == NULL) {
         EMIT_ERR_MSG(MemoryError, "BallTree node allocation failed");
         return NULL;

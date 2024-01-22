@@ -35,7 +35,7 @@ const double* binning_get_edges(const struct Binning *bins)
 
 double* binning_get_centers(const struct Binning *bins)
 {
-    double *centers = (double*)malloc(bins->n_bins * sizeof(double));
+    double *centers = malloc(bins->n_bins * sizeof(double));
     if (!centers) {
         return NULL;
     }
@@ -47,7 +47,7 @@ double* binning_get_centers(const struct Binning *bins)
 
 double* binning_get_widths(const struct Binning *bins)
 {
-    double *widths = (double*)malloc(bins->n_bins * sizeof(double));
+    double *widths = malloc(bins->n_bins * sizeof(double));
     if (!widths) {
         return NULL;
     }
@@ -59,7 +59,7 @@ double* binning_get_widths(const struct Binning *bins)
 
 int* binning_count(const struct Binning *bins, double *restrict data, int size)
 {
-    int *count = (int*)calloc(sizeof(int), bins->n_bins);
+    int *count = calloc(bins->n_bins, sizeof(int));
     if (!count) {
         return NULL;
     }
@@ -97,7 +97,7 @@ int* binning_count(const struct Binning *bins, double *restrict data, int size)
 
 int* binning_apply(const struct Binning *bins, double *restrict data, int size)
 {
-    int *count = (int*)malloc(sizeof(int) * size);
+    int *count = malloc(sizeof(int) * size);
     if (!count) {
         return NULL;
     }

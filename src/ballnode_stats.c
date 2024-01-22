@@ -13,13 +13,13 @@ StatsVector *statvec_new_reserve(long reserve_size) {
         return NULL;
     }
 
-    StatsVector *vec = (StatsVector *)malloc(sizeof(StatsVector));
+    StatsVector *vec = malloc(sizeof(StatsVector));
     if (vec == NULL) {
         EMIT_ERR_MSG(MemoryError, "StatsVector allocation failed");
         return NULL;
     }
 
-    vec->stats = (NodeStats *)malloc(vec->size * sizeof(NodeStats));
+    vec->stats = malloc(vec->size * sizeof(NodeStats));
     if (vec->stats == NULL) {
         EMIT_ERR_MSG(MemoryError, "StatsVector buffer allocation failed");
         free(vec);
@@ -44,7 +44,7 @@ int statvec_resize(StatsVector *vec, long size) {
     }
 
     size_t n_bytes = size * sizeof(NodeStats);
-    NodeStats *stats = (NodeStats *)realloc(vec->stats, n_bytes);
+    NodeStats *stats = realloc(vec->stats, n_bytes);
     if (stats == NULL) {
         EMIT_ERR_MSG(MemoryError, "StatsVector resizing failed");
         return BTR_FAILED;

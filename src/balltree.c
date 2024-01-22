@@ -31,7 +31,7 @@ BallTree *balltree_build_nocopy(PointBuffer *buffer, int leafsize) {
         return NULL;
     }
 
-    BallTree *tree = (BallTree*)malloc(sizeof(BallTree));
+    BallTree *tree = malloc(sizeof(BallTree));
     if (tree == NULL) {
         EMIT_ERR_MSG(MemoryError, "BallTree root allocation failed");
         return NULL;

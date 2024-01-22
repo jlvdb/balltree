@@ -13,14 +13,14 @@ PointBuffer *ptbuf_new(long size) {
         return NULL;
     }
 
-    PointBuffer *buffer = (PointBuffer *)malloc(sizeof(PointBuffer));
+    PointBuffer *buffer = malloc(sizeof(PointBuffer));
     if (buffer == NULL) {
         EMIT_ERR_MSG(MemoryError, "PointBuffer allocation failed");
         return NULL;
     }
 
     size_t n_bytes = size * sizeof(Point);
-    Point *points = (Point *)malloc(n_bytes);
+    Point *points = malloc(n_bytes);
     if (points == NULL) {
         EMIT_ERR_MSG(MemoryError, "PointBuffer buffer allocation failed");
         free(buffer);
@@ -81,7 +81,7 @@ int ptbuf_resize(PointBuffer *buffer, long size) {
     }
 
     size_t n_bytes = size * sizeof(Point);
-    Point *points = (Point*)realloc(buffer->points, n_bytes);
+    Point *points = realloc(buffer->points, n_bytes);
     if (points == NULL) {
         EMIT_ERR_MSG(MemoryError, "PointBuffer resizing failed");
         return BTR_FAILED;
@@ -124,7 +124,7 @@ PointBuffer *ptbuf_gen_random(double low, double high, long num_points) {
 }
 
 PointSlice *ptslc_from_buffer(const PointBuffer *buffer) {
-    PointSlice *slice = (PointSlice*)malloc(sizeof(PointSlice));
+    PointSlice *slice = malloc(sizeof(PointSlice));
     if (slice == NULL) {
         EMIT_ERR_MSG(MemoryError, "PointSlice allocation failed");
         return NULL;
