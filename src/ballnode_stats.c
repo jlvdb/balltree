@@ -7,9 +7,9 @@ StatsVector *statvec_new() {
     return statvec_new_reserve(32L);
 }
 
-StatsVector *statvec_new_reserve(long reserve_size) {
-    if (reserve_size < 1) {
-        EMIT_ERR_MSG(MemoryError, "StatsVector size must be positive");
+StatsVector *statvec_new_reserve(long reserve_capacity) {
+    if (reserve_capacity < 1) {
+        EMIT_ERR_MSG(MemoryError, "StatsVector capacity must be positive");
         return NULL;
     }
 
@@ -19,14 +19,14 @@ StatsVector *statvec_new_reserve(long reserve_size) {
         return NULL;
     }
 
-    vec->stats = malloc(vec->size * sizeof(NodeStats));
+    vec->stats = malloc(reserve_capacity * sizeof(NodeStats));
     if (vec->stats == NULL) {
         EMIT_ERR_MSG(MemoryError, "StatsVector buffer allocation failed");
-        free(vec);
+        statvec_free(vec);
         return NULL;
     }
-    vec->end = vec->stats;
-    vec->size = reserve_size;
+    vec->capacity = reserve_capacity;
+    vec->size = 0;
     return vec;
 }
 
@@ -37,13 +37,13 @@ void statvec_free(StatsVector *vec) {
     free(vec);
 }
 
-int statvec_resize(StatsVector *vec, long size) {
-    if (size < 1) {
-        EMIT_ERR_MSG(ValueError, "StatsVector size must be positive");
+int statvec_resize(StatsVector *vec, long capacity) {
+    if (capacity < 1) {
+        EMIT_ERR_MSG(ValueError, "StatsVector capacity must be positive");
         return BTR_FAILED;
     }
 
-    size_t n_bytes = size * sizeof(NodeStats);
+    size_t n_bytes = capacity * sizeof(NodeStats);
     NodeStats *stats = realloc(vec->stats, n_bytes);
     if (stats == NULL) {
         EMIT_ERR_MSG(MemoryError, "StatsVector resizing failed");
@@ -51,21 +51,20 @@ int statvec_resize(StatsVector *vec, long size) {
     }
 
     vec->stats = stats;
-    size_t offset = (vec->size < size) ? vec->size : size;
-    vec->end = stats + offset;
-    vec->size = size;
+    vec->capacity = capacity;
+    vec->size = (vec->size > capacity) ? capacity : vec->size;
     return BTR_SUCCESS;
 }
 
 int statvec_append(StatsVector *vec, const NodeStats *stats) {
-    if ((vec->end - vec->stats) >= vec->size) {
+    if (vec->size >= vec->capacity) {
         // double the vector size if necessary
-        if (statvec_resize(vec, vec->size * 2) == BTR_FAILED) {
+        if (statvec_resize(vec, vec->capacity * 2) == BTR_FAILED) {
             return BTR_FAILED;
         }
     }
-    *vec->end = *stats;
-    ++(vec->end);
+    vec->stats[vec->size] = *stats;
+    ++(vec->size);
     return BTR_SUCCESS;
 }
 

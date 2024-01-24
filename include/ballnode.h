@@ -3,6 +3,8 @@
 
 #include "point.h"
 
+#define BALLNODE_IS_LEAF(node) (node)->is_leaf
+
 typedef struct {
     double x;
     double y;
@@ -31,8 +33,6 @@ struct BallNode {
 };
 typedef struct BallNode BallNode;
 
-#define BALLNODE_IS_LEAF(node) (node)->is_leaf
-
 typedef struct {
     long depth;
     long num_points;
@@ -43,7 +43,7 @@ typedef struct {
 
 typedef struct {
     NodeStats *stats;
-    NodeStats *end;
+    long capacity;
     long size;
 } StatsVector;
 
