@@ -299,8 +299,7 @@ static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
 
 static PyObject *statvec_get_numpy_array(StatsVector *vec) {
     const npy_intp ndim = 1;
-    const size_t size = vec->end - vec->stats;
-    npy_intp shape[1] = {size};
+    npy_intp shape[1] = {vec->size};
 
     // construct an appropriate dtype for StatsVector
     PyObject *arr_dtype = Py_BuildValue(
@@ -332,7 +331,7 @@ static PyObject *statvec_get_numpy_array(StatsVector *vec) {
         return NULL;
     }
     void *ptr = PyArray_DATA(array);
-    memcpy(ptr, vec->stats, sizeof(NodeStats) * size);
+    memcpy(ptr, vec->stats, sizeof(NodeStats) * vec->size);
     return array;
 }
 
