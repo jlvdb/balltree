@@ -237,7 +237,7 @@ error:
 }
 
 void bnode_free(BallNode *node) {
-    if (BALLNODE_IS_LEAF(node)) {
+    if (!BALLNODE_IS_LEAF(node)) {
         bnode_free(node->childs.left);
         bnode_free(node->childs.right);
     }

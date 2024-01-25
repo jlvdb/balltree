@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC;
     printf("self found %11.0lf pairs in %7.3lf sec\n", count, elapsed);
 
-    // dump and restore
+    // dump tree
     const char fpath[] = "testing/serialised.tree";
     time = clock();
     if (balltree_to_file(tree, fpath) != 0) {
@@ -81,16 +81,17 @@ int main(int argc, char** argv) {
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
     printf("dumped   in %7.3lf ms\n", elapsed);
+    balltree_free(tree);
+
+    // restore tree
     time = clock();
     BallTree *tree2 = balltree_from_file(fpath);
     if (tree2 == NULL) {
-        balltree_free(tree); 
         return 1;  
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
     printf("restored in %7.3lf ms\n", elapsed);
 
-    balltree_free(tree);
     count = balltree_dualcount_radius(tree2, tree2, query_radius);
     printf("self found %11.0lf pairs\n", count);
 

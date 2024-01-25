@@ -32,35 +32,31 @@ BallTree *balltree_build_nocopy(PointBuffer *buffer, int leafsize) {
         return NULL;
     }
 
+    PointSlice *slice = ptslc_from_buffer(buffer);
+    if (slice == NULL) {
+        return NULL;
+    }
+    BallNode *root = bnode_build(slice, leafsize);
+    free(slice);
+    if (root == NULL) {
+        return NULL;
+    }
+
     BallTree *tree = malloc(sizeof(BallTree));
     if (tree == NULL) {
         EMIT_ERR_MSG(MemoryError, "BallTree root allocation failed");
+        bnode_free(root);
         return NULL;
     }
     tree->leafsize = leafsize;
     tree->data_owned = 0;
     tree->data = *buffer;
-
-    PointSlice *slice = ptslc_from_buffer(buffer);
-    if (slice == NULL) {
-        goto error;
-    }
-    BallNode *root = bnode_build(slice, leafsize);
-    if (root == NULL) {
-        free(slice);
-        goto error;
-    }
     tree->root = root;
-
     return tree;
-
-error:
-    balltree_free(tree);
-    return NULL;
 }
 
 void balltree_free(BallTree *tree) {
-    if (tree->data.points != NULL) {
+    if (tree->data_owned && tree->data.points != NULL) {
         free(tree->data.points);
     }
     if (tree->root != NULL) {
