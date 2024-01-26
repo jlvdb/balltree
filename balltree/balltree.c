@@ -50,7 +50,7 @@ static PyObject *PyBallTree_dualcount_range(PyBallTree *self, PyObject *args);
 
 static const char *PyString_to_char(PyObject* py_string) {
     if (!PyUnicode_Check(py_string)) {
-        PyErr_SetString(PyExc_TypeError, "input must be a string");
+        PyErr_SetString(PyExc_TypeError, "input must be of type 'str'");
         return NULL;
     }
 
@@ -68,34 +68,33 @@ static Point *PyIter_to_point(PyObject *coord_iter, double weight) {
     const char err_msg[] = "expected a sequence with length 3";
     PyObject *coord_seq = PySequence_Fast(coord_iter, err_msg);
     if (coord_seq == NULL) {
-        goto fail;
+        goto error;
     }
     Py_ssize_t seq_length = PySequence_Fast_GET_SIZE(coord_seq);
     if (seq_length != 3) {
         PyErr_SetString(PyExc_ValueError, err_msg);
-        goto fail;
+        goto error;
     }
 
     // create the point instance from the python sequence
     Point *point = malloc(sizeof(Point));
     if (point == NULL) {
         PyErr_SetString(PyExc_MemoryError, "failed to allocate Point");
-        goto fail;
+        goto error;
     }
     point->x = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(coord_seq, 0));
     point->y = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(coord_seq, 1));
     point->z = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(coord_seq, 2));
     point->weight = weight;
-    Py_DECREF(coord_seq);
     if (PyErr_Occurred()) {
-        PyErr_SetString(PyExc_ValueError, "cannot convert coordinates to float");
-        return NULL;
+        free(point);
+        goto error;
     }
 
     return point;
 
-fail:
-    Py_DECREF(coord_seq);
+error:
+    Py_XDECREF(coord_seq);
     return NULL;
 }
 
@@ -272,8 +271,7 @@ static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
     );
     if (arr_dtype == NULL) {
         return NULL;
-    
-}
+    }
     // get the numpy API array descriptor
     PyArray_Descr *arr_descr;
     int result = PyArray_DescrConverter(arr_dtype, &arr_descr);  // PyArray_Descr **
@@ -478,7 +476,7 @@ static PyObject *PyBallTree_from_file(PyTypeObject *type, PyObject *args) {
 // PyBallTree: property implementations ////////////////////////////////////////
 
 static PyObject *PyBallTree_get_data(PyBallTree *self, void *closure) {
-    return ptbuf_get_numpy_view(&self->balltree->data);
+    return ptbuf_get_numpy_view(self->balltree->data);
 }
 
 static PyObject *PyBallTree_get_num_data(PyBallTree *self, void *closure) {
@@ -496,13 +494,12 @@ static PyObject *PyBallTree_get_sum_weight(PyBallTree *self, void *closure) {
 static PyObject *PyBallTree_get_center(PyBallTree *self, void *closure) {
     PyObject *tuple = NULL;
     PyObject *x = PyFloat_FromDouble(self->balltree->root->ball.x);
-    PyObject *y = PyFloat_FromDouble(self->balltree->root->ball.x);
-    PyObject *z = PyFloat_FromDouble(self->balltree->root->ball.x);
-    if (x == NULL || y == NULL || z == NULL) {
-        goto error;
+    PyObject *y = PyFloat_FromDouble(self->balltree->root->ball.y);
+    PyObject *z = PyFloat_FromDouble(self->balltree->root->ball.z);
+
+    if (x != NULL && y != NULL && z != NULL) {
+        tuple = PyTuple_Pack(3, x, y, z);  // adds additional references to x, y, z
     }
-    tuple = PyTuple_Pack(3, x, y, z);  // adds additional references to x, y, z
-error:
     Py_XDECREF(x);
     Py_XDECREF(y);
     Py_XDECREF(z);
