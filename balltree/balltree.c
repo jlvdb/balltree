@@ -395,13 +395,13 @@ static int PyBallTree_init(
         return -1;
     }
 
-    // build the balltree
+    // build the balltree (takes ownership of buffer)
     BallTree *tree = balltree_build_nocopy(buffer, leafsize);
     if (tree == NULL) {
         ptbuf_free(buffer);
         return -1;
     }
-    tree->data_owned = 1;  // buffer was not copied, but tree owns it from now
+    tree->data_owned = 1;  // ownership transfer, buffer deallocated with tree
     self->balltree = tree;
     return 0;
 }
@@ -436,14 +436,18 @@ static PyObject *PyBallTree_from_random(
         return NULL;
     }
 
-    // build the balltree
-    BallTree *tree = balltree_build_leafsize(buffer, leafsize);
+    // build the balltree (takes ownership of buffer)
+    BallTree *tree = balltree_build_nocopy(buffer, leafsize);
     if (tree == NULL) {
+        ptbuf_free(buffer);
         return NULL;
     }
-    ptbuf_free(buffer);  // buffer is copied into tree
+    tree->data_owned = 1;  // ownership transfer, buffer deallocated with tree
+
     PyBallTree *self = (PyBallTree *)type->tp_alloc(type, 0);
-    if (self != NULL) {
+    if (self == NULL) {
+        balltree_free(tree);
+    } else {
         self->balltree = tree;
     }
     return (PyObject *)self;
@@ -465,7 +469,9 @@ static PyObject *PyBallTree_from_file(PyTypeObject *type, PyObject *args) {
         return NULL;
     }
     PyBallTree *self = (PyBallTree *)type->tp_alloc(type, 0);
-    if (self != NULL) {
+    if (self == NULL) {
+        balltree_free(tree);
+    } else {
         self->balltree = tree;
     }
     return (PyObject *)self;
@@ -490,12 +496,19 @@ static PyObject *PyBallTree_get_sum_weight(PyBallTree *self, void *closure) {
 }
 
 static PyObject *PyBallTree_get_center(PyBallTree *self, void *closure) {
-    return PyTuple_Pack(
-        3,
-        PyFloat_FromDouble(self->balltree->root->ball.x),
-        PyFloat_FromDouble(self->balltree->root->ball.y),
-        PyFloat_FromDouble(self->balltree->root->ball.z)
-    );
+    PyObject *tuple = NULL;
+    PyObject *x = PyFloat_FromDouble(self->balltree->root->ball.x);
+    PyObject *y = PyFloat_FromDouble(self->balltree->root->ball.x);
+    PyObject *z = PyFloat_FromDouble(self->balltree->root->ball.x);
+    if (x == NULL || y == NULL || z == NULL) {
+        goto error;
+    }
+    tuple = PyTuple_Pack(3, x, y, z);  // adds additional references to x, y, z
+error:
+    Py_XDECREF(x);
+    Py_XDECREF(y);
+    Py_XDECREF(z);
+    return tuple;
 }
 
 static PyObject *PyBallTree_get_radius(PyBallTree *self, void *closure) {
