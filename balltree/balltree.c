@@ -396,10 +396,12 @@ static int PyBallTree_init(
     }
 
     // build the balltree
-    BallTree *tree = balltree_build_nocopy(buffer, leafsize);  // buffer owner
+    BallTree *tree = balltree_build_nocopy(buffer, leafsize);
     if (tree == NULL) {
+        ptbuf_free(buffer);
         return -1;
     }
+    tree->data_owned = 1;  // buffer was not copied, but tree owns it from now
     self->balltree = tree;
     return 0;
 }
@@ -476,7 +478,7 @@ static PyObject *PyBallTree_get_data(PyBallTree *self, void *closure) {
 }
 
 static PyObject *PyBallTree_get_num_data(PyBallTree *self, void *closure) {
-    return PyLong_FromLong(self->balltree->data.size);
+    return PyLong_FromLong(self->balltree->data->size);
 }
 
 static PyObject *PyBallTree_get_leafsize(PyBallTree *self, void *closure) {
@@ -512,7 +514,7 @@ static PyObject *PyBallTree_str(PyBallTree *self) {
         buffer,
         sizeof(buffer),
         "BallTree(num_data=%d, radius=%.3f, center={%+.3f, %+.3f, %+.3f})",
-        tree->data.size,
+        tree->data->size,
         node->ball.radius,
         node->ball.x,
         node->ball.y,
