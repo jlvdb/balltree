@@ -37,8 +37,8 @@ static FileHeader *fileheader_new(const BallTree *tree);
 static int fileheader_write(const FileHeader *header, FILE *file);
 static FileHeader *fileheader_read(FILE *file);
 
-static int bnode_serialise(const BallNode *node, BNodeBuffer *buffer, size_t buf_idx, Point *points);
-static BallNode *bnode_deserialise(const BNodeBuffer *buffer, size_t buf_idx, Point *points);
+static int bnode_serialise(const BallNode *node, BNodeBuffer *buffer, size_t buf_idx, PointBuffer *points);
+static BallNode *bnode_deserialise(const BNodeBuffer *buffer, size_t buf_idx, PointBuffer *points);
 
 
 static int ptbuf_write(const PointBuffer *buffer, FILE *file) {
@@ -128,7 +128,7 @@ static FileHeader *fileheader_new(const BallTree *tree) {
     }
 
     header->points = (SectionHeader){
-        .n_items = tree->data.size,
+        .n_items = tree->data->size,
         .itemsize = sizeof(Point),
     };
     header->nodes = (SectionHeader){
@@ -170,7 +170,7 @@ static int bnode_serialise(
     const BallNode *node,
     BNodeBuffer *buffer,
     size_t buf_idx,
-    Point *points
+    PointBuffer *points
 ) {
     if (buffer->next_free > buffer->size) {
         EMIT_ERR_MSG(IndexError, "buffer is too small to store further nodes");
@@ -184,8 +184,8 @@ static int bnode_serialise(
     if (BALLNODE_IS_LEAF(node)) {
         // replace pointers to slice start/end by index into point data buffer,
         // see bnode_deserialise()
-        stored->data.start = (Point *)(node->data.start - points);
-        stored->data.end = (Point *)(node->data.end - points);
+        stored->data.start = (Point *)(node->data.start - points->points);
+        stored->data.end = (Point *)(node->data.end - points->points);
     } else {
         // replace pointers to childs by index in buffer they will be stored at
         size_t left_idx = bnodebuffer_get_next_free(buffer);
@@ -223,7 +223,7 @@ int balltree_to_file(const BallTree *tree, const char *path) {
     }
 
     // append the tree's data points to the file
-    if (ptbuf_write(&tree->data, file) == BTR_FAILED) {
+    if (ptbuf_write(tree->data, file) == BTR_FAILED) {
         goto err_dealloc_header;
     }
 
@@ -233,7 +233,7 @@ int balltree_to_file(const BallTree *tree, const char *path) {
         goto err_dealloc_header;
     }
     size_t root_index = bnodebuffer_get_next_free(nodebuffer);
-    if (bnode_serialise(tree->root, nodebuffer, root_index, tree->data.points) == BTR_FAILED) {
+    if (bnode_serialise(tree->root, nodebuffer, root_index, tree->data) == BTR_FAILED) {
         goto err_dealloc_bnodebuffer;
     }
     if (bnodebuffer_write(nodebuffer, file) == BTR_FAILED) {
@@ -260,7 +260,7 @@ error:
 static BallNode *bnode_deserialise(
     const BNodeBuffer *buffer,
     size_t buf_idx,
-    Point *points
+    PointBuffer *points
 ) {
     if (buf_idx >= buffer->size) {
         EMIT_ERR_MSG(IndexError, "node index exceeds node buffer size");
@@ -279,8 +279,8 @@ static BallNode *bnode_deserialise(
     if (BALLNODE_IS_LEAF(node)) {
         // restore pointers to slice start/end from their index into the point
         // data buffer, see bnode_serialise()
-        node->data.start = points + (size_t)node->data.start;
-        node->data.end = points + (size_t)node->data.end;
+        node->data.start = points->points + (size_t)node->data.start;
+        node->data.end = points->points + (size_t)node->data.end;
     } else {
         // restore child instances from their index into node buffer
         size_t left_idx = (size_t)node->childs.left;
@@ -326,7 +326,7 @@ BallTree* balltree_from_file(const char *path) {
     if (nodebuffer == NULL) {
         goto err_dealloc_points;
     }
-    BallNode *root = bnode_deserialise(nodebuffer, 0L, points->points);
+    BallNode *root = bnode_deserialise(nodebuffer, 0L, points);
     if (root == NULL) {
         goto err_dealloc_bnodebuffer;
     }
@@ -338,7 +338,7 @@ BallTree* balltree_from_file(const char *path) {
     }
     tree->leafsize = header->leafsize;
     tree->data_owned = 1;  // after deserialising, the buffer from the file is used
-    tree->data = *points;  // move ownership of underlying point buffer
+    tree->data = points;  // move ownership of underlying point buffer
     tree->root = root;
 
 err_dealloc_root:

@@ -8,7 +8,7 @@
 
 typedef struct {
     BallNode *root;
-    PointBuffer data;
+    PointBuffer *data;
     int leafsize;
     int data_owned;
 } BallTree;

@@ -50,14 +50,14 @@ BallTree *balltree_build_nocopy(PointBuffer *buffer, int leafsize) {
     }
     tree->leafsize = leafsize;
     tree->data_owned = 0;
-    tree->data = *buffer;
+    tree->data = buffer;
     tree->root = root;
     return tree;
 }
 
 void balltree_free(BallTree *tree) {
-    if (tree->data_owned && tree->data.points != NULL) {
-        free(tree->data.points);
+    if (tree->data_owned && tree->data != NULL) {
+        ptbuf_free(tree->data);
     }
     if (tree->root != NULL) {
         bnode_free(tree->root);
