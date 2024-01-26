@@ -9,11 +9,8 @@
 
 // helper functions
 static const char *PyString_to_char(PyObject* py_string);
-static Point *PyIter_to_point(PyObject *point_iter, double weight);
-static NpyIter *numpy_iter_point_arrays(PyArrayObject *x_obj, PyArrayObject *y_obj, PyArrayObject *z_obj, PyArrayObject *weight_obj);
-static npy_intp check_arrays_dtype_shape(PyObject *x_obj, PyObject *y_obj, PyObject *z_obj, PyObject *weight_obj);
-static PyObject *numpy_ones_1dim(npy_intp size);
-static PointBuffer *ptbuf_from_numpy_array(PyArrayObject *x_obj, PyArrayObject *y_obj, PyArrayObject *z_obj, PyArrayObject *weight_obj);
+static Point *point_from_PyIter(PyObject *point_iter, double weight);
+static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj);
 static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer);
 static PyObject *statvec_get_numpy_array(StatsVector *vec);
 
@@ -63,7 +60,7 @@ static const char *PyString_to_char(PyObject* py_string) {
     return string;
 }
 
-static Point *PyIter_to_point(PyObject *coord_iter, double weight) {
+static Point *point_from_PyIter(PyObject *coord_iter, double weight) {
     // check the input to be an iterator with size 3
     const char err_msg[] = "expected a sequence with length 3";
     PyObject *coord_seq = PySequence_Fast(coord_iter, err_msg);
@@ -98,162 +95,165 @@ error:
     return NULL;
 }
 
-static NpyIter *numpy_iter_point_arrays(
-    PyArrayObject *x_obj,
-    PyArrayObject *y_obj,
-    PyArrayObject *z_obj,
-    PyArrayObject *weight_obj
-) {
-    const int n_arrays = 4;
-    PyArrayObject *arrays[4] = {x_obj, y_obj, z_obj, weight_obj};
-    npy_uint32 array_flags[4] = {
-        NPY_ITER_READONLY,
-        NPY_ITER_READONLY,
-        NPY_ITER_READONLY,
-        NPY_ITER_READONLY,
-    };
-    NpyIter *iter = NpyIter_MultiNew(
-        n_arrays,
-        arrays,
-        NPY_ITER_EXTERNAL_LOOP,
+static PyObject *xyz_ensure_2dim_double(PyObject *xyz_obj) {
+    PyObject *xyz_arr = PyArray_FromAny(
+        xyz_obj,
+        PyArray_DescrFromType(NPY_FLOAT64),
+        1,
+        2,
+        NPY_ARRAY_ALIGNED,
+        NULL
+    );
+    if (xyz_arr == NULL) {
+        goto error;
+    }
+
+    // ensure array is 2-dim in case where xyz = (x,y,z) or has shape (N, 3)
+    const char dim_err_msg[] = "'xyz' must be of shape (3,) or (N, 3)";
+
+    // create a new array with shape (1, 3) or raise an appropriate exception
+    if (PyArray_NDIM(xyz_arr) == 1) {
+        if (PyArray_DIM(xyz_arr, 0) == 3) {
+            npy_intp new_dim[2] = {1, 3};
+            PyObject *temp_arr = PyArray_Reshape(xyz_arr, new_dim);
+            Py_DECREF(xyz_arr);
+            xyz_arr = temp_arr;
+            if (xyz_arr == NULL) {
+                PyErr_SetString(PyExc_MemoryError, "Failed to cast 'xyz' from shape (3,) to (1, 3)");
+                goto error;
+            }
+        } else {
+            PyErr_SetString(PyExc_ValueError, dim_err_msg);
+        }
+    }
+
+    // ensure shape is (N, 3)
+    else if (PyArray_DIM(xyz_arr, 1) != 3) {
+        PyErr_SetString(PyExc_ValueError, dim_err_msg);
+        goto error;
+    }
+
+    return xyz_arr;
+
+error:
+    Py_XDECREF(xyz_arr);
+    return NULL;
+}
+
+static PyObject *weight_ensure_1dim_double_exists(PyObject *weight_obj, npy_intp length) {
+    PyObject *weight_arr;
+    int weight_exist = weight_obj != Py_None;
+
+    // attempt to build an array from the input
+    if (weight_exist) {
+        weight_arr = PyArray_FromAny(
+            weight_obj,
+            PyArray_DescrFromType(NPY_FLOAT64),
+            1,
+            1,
+            NPY_ARRAY_CARRAY_RO,  // allow direct buffer indexing for convenience
+            NULL
+        );
+        if (weight_arr == NULL) {
+            return NULL;
+        }
+        if (PyArray_DIM(weight_arr, 0) != length) {
+            PyErr_SetString(PyExc_ValueError, "'xyz' and 'weight' must have the same length");
+            Py_DECREF(weight_arr);
+            return NULL;
+        }
+    }
+    
+    // create an empty array initialised to 1.0
+    else {
+        npy_intp weight_shape[1] = {length};
+        weight_arr = PyArray_EMPTY(1, weight_shape, NPY_DOUBLE, 0);
+        if (weight_arr == NULL) {
+            PyErr_SetString(PyExc_MemoryError, "failed to allocate weight array");
+            return NULL;
+        }
+        double *weight_buffer = PyArray_DATA(weight_arr);
+        for (npy_intp i = 0; i < length; ++i) {
+            weight_buffer[i] = 1.0;
+        }
+    }
+
+    return weight_arr;
+}
+
+static PointBuffer *ptbuf_from_xyz_weight_arr(PyObject *xyz_arr, PyObject *weight_arr) {
+    PointBuffer *buffer = NULL;  // return value
+    double *weight_buffer = PyArray_DATA(weight_arr);
+
+    // iterator for xzy array
+    NpyIter *iter = NpyIter_New(
+        xyz_arr,
+        NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP,
         NPY_KEEPORDER,
-        NPY_SAFE_CASTING,
-        array_flags,
+        NPY_NO_CASTING,
         NULL
     );
     if (iter == NULL) {
-        PyErr_SetString(PyExc_IndexError, "failed to create interator for input arrays");
-        return NULL;
+        goto error;
     }
-    return iter;
-}
-
-static npy_intp check_arrays_dtype_shape(
-    PyObject *x_obj,
-    PyObject *y_obj,
-    PyObject *z_obj,
-    PyObject *weight_obj
-) {
-    // check if all inputs are arrays
-    int weights_provided = weight_obj != Py_None;
-    if (PyArray_Check(x_obj) == 0) {
-        PyErr_SetString(PyExc_TypeError, "'x' must be a numpy array");
-        return -1;
-    }
-    if (PyArray_Check(y_obj) == 0) {
-        PyErr_SetString(PyExc_TypeError, "'y' must be a numpy array");
-        return -1;
-    }
-    if (PyArray_Check(z_obj) == 0) {
-        PyErr_SetString(PyExc_TypeError, "'z' must be a numpy array");
-        return -1;
-    }
-    if (weights_provided && PyArray_Check(weight_obj) == 0) {
-        PyErr_SetString(PyExc_TypeError, "'weight' must be a numpy array or None");
-        return -1;
-    }
-
-    // check input array dimensions
-    if (PyArray_NDIM(x_obj) != 1 ||
-        PyArray_NDIM(y_obj) != 1 ||
-        PyArray_NDIM(z_obj) != 1 ||
-        (weights_provided && PyArray_NDIM(weight_obj) != 1)
-    ) {
-        PyErr_SetString(PyExc_ValueError, "all arrays must be one-dimensional");
-        return -1;
-    }
-    npy_intp size = PyArray_DIM(x_obj, 0);
-    if (PyArray_DIM(y_obj, 0) != size ||
-        PyArray_DIM(z_obj, 0) != size ||
-        (weights_provided && PyArray_DIM(weight_obj, 0) != size)
-    ) {
-        PyErr_SetString(PyExc_ValueError, "all arrays must have the same shape");
-        return -1;
-    }
-
-    return size;
-}
-
-static PyObject *numpy_ones_1dim(npy_intp size) {
-    const npy_intp ndim = 1;
-    npy_intp shape[1] = {size};
-    PyObject *array = PyArray_EMPTY(ndim, shape, NPY_DOUBLE, 0);
-    if (array == NULL) {
-        PyErr_SetString(PyExc_MemoryError, "failed to allocate array");
-        return NULL;
-    }
-
-    npy_double *buffer = PyArray_DATA(array);
-    for (npy_intp i = 0; i < size; ++i) {
-        buffer[i] = 1.0;
-    }
-    return array;
-}
-
-static PointBuffer *ptbuf_from_numpy_array(
-    PyArrayObject *x_obj,
-    PyArrayObject *y_obj,
-    PyArrayObject *z_obj,
-    PyArrayObject *weight_obj
-) {
-    NpyIter *multi_iter = numpy_iter_point_arrays(x_obj, y_obj, z_obj, weight_obj);
-    if (multi_iter == NULL) {
-        return NULL;
-    }
-
-    // set up the output buffer
-    int size = NpyIter_GetIterSize(multi_iter);
-    PointBuffer *buffer = ptbuf_new(size);
-    if (buffer == NULL) {
-        NpyIter_Deallocate(multi_iter);
-        return NULL;
-    }
-    Point *points = buffer->points;
-
-    // set up pointers for iteration, no require any defereferencing
-    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(multi_iter, NULL);
+    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
     if (iternext == NULL) {
-        PyErr_SetString(PyExc_ValueError, "failed to create iterator for input arrays");
-        NpyIter_Deallocate(multi_iter);
-        ptbuf_free(buffer);
-        return NULL;
+        goto error;
     }
-    char **dataptr = NpyIter_GetDataPtrArray(multi_iter);
-    npy_intp *strideptr = NpyIter_GetInnerStrideArray(multi_iter);
-    npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(multi_iter);
+    double **dataptr = NpyIter_GetDataPtrArray(iter);
+    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
+    npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(iter);
 
-    // iterate and interpret values as doubles and copy values into PointBuffer
-    int idx_ptbuf = 0;
-    do {  // the outer loop should be just a single iteration
-        char *ptr_x = dataptr[0];
-        char *ptr_y = dataptr[1];
-        char *ptr_z = dataptr[2];
-        char *ptr_weight = dataptr[3];
-        npy_intp stride_x = strideptr[0];
-        npy_intp stride_y = strideptr[1];
-        npy_intp stride_z = strideptr[2];
-        npy_intp stride_weight = strideptr[3];
-
-        // run inner loop of all elements
-        npy_intp count = *innersizeptr;
-        while (count--) {
-            points[idx_ptbuf] = point_create_weighted(
-                *(double *)ptr_x,
-                *(double *)ptr_y,
-                *(double *)ptr_z,
-                *(double *)ptr_weight
-            );
-            ++idx_ptbuf;
-            // move the iterator corresponding to the data size
-            ptr_x += stride_x;
-            ptr_y += stride_y;
-            ptr_z += stride_z;
-            ptr_weight += stride_weight;
-
+    // create the PointBuffer and fill it with the provided data
+    long size = PyArray_DIM(xyz_arr, 0);
+    buffer = ptbuf_new(size);
+    if (buffer == NULL) {
+        goto error;
+    }
+    long pt_idx = 0;
+    do {
+        double *xyz = *dataptr;
+        for (long flat_idx = 0; flat_idx < *innersizeptr; flat_idx += 3, ++pt_idx) {
+            buffer->points[pt_idx] = (Point){
+                .x = xyz[flat_idx],
+                .y = xyz[flat_idx + 1],
+                .z = xyz[flat_idx + 2],
+                .weight = weight_buffer[pt_idx],
+            };
         }
-    } while (iternext(multi_iter));
+    } while(iternext(iter));
 
-    NpyIter_Deallocate(multi_iter);
+error:
+    if (iter != NULL) {
+        NpyIter_Deallocate(iter);
+    }
+    return buffer;
+}
+
+static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj) {
+    PointBuffer *buffer = NULL;  // return value
+    PyObject *xyz_arr = NULL, *weight_arr = NULL;
+
+    xyz_arr = xyz_ensure_2dim_double(xyz_obj);
+    if (xyz_arr == NULL) {
+        goto error;
+    }
+    npy_intp length = PyArray_DIM(xyz_arr, 0);
+    if (length == 0) {
+        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
+        goto error;
+    }
+
+    weight_arr = weight_ensure_1dim_double_exists(weight_obj, length);
+    if (weight_arr == NULL) {
+        goto error;
+    }
+
+    buffer = ptbuf_from_xyz_weight_arr(xyz_arr, weight_arr);
+
+error:
+    Py_XDECREF(xyz_arr);
+    Py_XDECREF(weight_arr);
     return buffer;
 }
 
@@ -354,39 +354,16 @@ static int PyBallTree_init(
     PyObject *args,
     PyObject *kwargs
 ) {
-    static char *kwlist[] = {"x", "y", "z", "weight", "leafsize", NULL};
-    PyObject *x_obj, *y_obj, *z_obj, *weight_obj = Py_None;
+    static char *kwlist[] = {"xyz", "weight", "leafsize", NULL};
+    PyObject *xyz_obj, *weight_obj = Py_None;
     int leafsize = DEFAULT_LEAFSIZE;
     if (!PyArg_ParseTupleAndKeywords(
-            args, kwargs, "OOO|Oi", kwlist,
-            &x_obj, &y_obj, &z_obj, &weight_obj, &leafsize)
+            args, kwargs, "O|Oi", kwlist,
+            &xyz_obj, &weight_obj, &leafsize)
     ) {
         return -1;
     }
-    int weights_provided = weight_obj != Py_None;
-
-    // check the input data and create a numpy array with ones if weight is None
-    npy_intp size = check_arrays_dtype_shape(x_obj, y_obj, z_obj, weight_obj);
-    if (size == -1) {
-        return -1;
-    }
-    if (size == 0) {
-        PyErr_SetString(PyExc_ValueError, "need at least one data point");
-        return -1;
-    }
-    if (!weights_provided) {
-        weight_obj = numpy_ones_1dim(size);
-    }
-
-    PointBuffer *buffer = ptbuf_from_numpy_array(
-        (PyArrayObject *)x_obj,
-        (PyArrayObject *)y_obj,
-        (PyArrayObject *)z_obj,
-        (PyArrayObject *)weight_obj
-    );
-    if (!weights_provided) {
-        Py_DECREF(&weight_obj);
-    }
+    PointBuffer *buffer = ptbuf_from_PyObjects(xyz_obj, weight_obj);
     if (buffer == NULL) {
         return -1;
     }
@@ -597,7 +574,7 @@ static PyObject *PyBallTree_count_radius(
     ) {
         return NULL;
     }
-    Point *point = PyIter_to_point(coord_iter, weight);
+    Point *point = point_from_PyIter(coord_iter, weight);
     if (point == NULL) {
         return NULL;
     }
@@ -622,7 +599,7 @@ static PyObject *PyBallTree_count_range(
     ) {
         return NULL;
     }
-    Point *point = PyIter_to_point(coord_iter, weight);
+    Point *point = point_from_PyIter(coord_iter, weight);
     if (point == NULL) {
         return NULL;
     }
