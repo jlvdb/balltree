@@ -7,9 +7,21 @@
 #include "balltree.h"
 #include "balltree_macros.h"
 
+static struct NpyIterHelper {
+    NpyIter *iter;
+    NpyIter_IterNextFunc *next;
+    npy_intp *stride;
+    npy_intp *innersize;
+    double **dataptr;
+};
+
+static struct NpyIterHelper *npyiterhelper_new(PyObject *xyz_arr);
+static void npyiterhelper_free(struct NpyIterHelper *iter);
+
 // helper functions
 static const char *PyString_to_char(PyObject* py_string);
 static Point *point_from_PyIter(PyObject *point_iter, double weight);
+static PointBuffer *ptbuf_from_xyz_weight_arr(PyObject *xyz_arr, PyObject *weight_arr);
 static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj);
 static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer);
 static PyObject *statvec_get_numpy_array(StatsVector *vec);
@@ -42,6 +54,40 @@ static PyObject *PyBallTree_count_radius(PyBallTree *self, PyObject *args, PyObj
 static PyObject *PyBallTree_count_range(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_dualcount_radius(PyBallTree *self, PyObject *args);
 static PyObject *PyBallTree_dualcount_range(PyBallTree *self, PyObject *args);
+
+
+static struct NpyIterHelper *npyiterhelper_new(PyObject *xyz_arr) {
+    struct NpyIterHelper *iterhelper = malloc(sizeof(struct NpyIterHelper));
+    if (iterhelper == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "failed to allocate NpyIterHelper");
+        return NULL;
+    }
+
+    NpyIter *iter = NpyIter_New(
+        xyz_arr,
+        NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP,
+        NPY_KEEPORDER,
+        NPY_NO_CASTING,
+        NULL
+    );
+    if (iter == NULL) {
+        free(iterhelper);
+        return NULL;
+    }
+    iterhelper->iter = iter;
+    iterhelper->next = NpyIter_GetIterNext(iter, NULL);
+    iterhelper->stride = NpyIter_GetInnerStrideArray(iter);
+    iterhelper->innersize = NpyIter_GetInnerLoopSizePtr(iter);
+    iterhelper->dataptr = NpyIter_GetDataPtrArray(iter);
+    return iterhelper;
+}
+
+static void npyiterhelper_free(struct NpyIterHelper *iter) {
+    if (iter->iter != NULL) {
+        NpyIter_Deallocate(iter->iter);
+    }
+    free(iter);
+}
 
 // helper functions ////////////////////////////////////////////////////////////
 
@@ -182,51 +228,34 @@ static PyObject *weight_ensure_1dim_double_exists(PyObject *weight_obj, npy_intp
 }
 
 static PointBuffer *ptbuf_from_xyz_weight_arr(PyObject *xyz_arr, PyObject *weight_arr) {
-    PointBuffer *buffer = NULL;  // return value
-    double *weight_buffer = PyArray_DATA(weight_arr);
-
-    // iterator for xzy array
-    NpyIter *iter = NpyIter_New(
-        xyz_arr,
-        NPY_ITER_READONLY | NPY_ITER_EXTERNAL_LOOP,
-        NPY_KEEPORDER,
-        NPY_NO_CASTING,
-        NULL
-    );
-    if (iter == NULL) {
-        goto error;
-    }
-    NpyIter_IterNextFunc *iternext = NpyIter_GetIterNext(iter, NULL);
-    if (iternext == NULL) {
-        goto error;
-    }
-    double **dataptr = NpyIter_GetDataPtrArray(iter);
-    npy_intp *strideptr = NpyIter_GetInnerStrideArray(iter);
-    npy_intp *innersizeptr = NpyIter_GetInnerLoopSizePtr(iter);
-
-    // create the PointBuffer and fill it with the provided data
     long size = PyArray_DIM(xyz_arr, 0);
-    buffer = ptbuf_new(size);
+    PointBuffer *buffer = ptbuf_new(size);
     if (buffer == NULL) {
-        goto error;
+        return NULL;
+    }
+
+    // fill buffer it with the provided data
+    struct NpyIterHelper *xyz_iter = npyiterhelper_new(xyz_arr);
+    if (xyz_iter == NULL) {
+        ptbuf_free(buffer);
+        return NULL;
     }
     long pt_idx = 0;
+    double *weight_buffer = PyArray_DATA(weight_arr);
     do {
-        double *xyz = *dataptr;
-        for (long flat_idx = 0; flat_idx < *innersizeptr; flat_idx += 3, ++pt_idx) {
+        double *xyz = *xyz_iter->dataptr;
+        for (long flat_idx = 0; flat_idx < *xyz_iter->innersize; flat_idx += 3) {
             buffer->points[pt_idx] = (Point){
                 .x = xyz[flat_idx],
                 .y = xyz[flat_idx + 1],
                 .z = xyz[flat_idx + 2],
                 .weight = weight_buffer[pt_idx],
             };
+            ++pt_idx;
         }
-    } while(iternext(iter));
+    } while(xyz_iter->next(xyz_iter->iter));
 
-error:
-    if (iter != NULL) {
-        NpyIter_Deallocate(iter);
-    }
+    npyiterhelper_free(xyz_iter);
     return buffer;
 }
 
