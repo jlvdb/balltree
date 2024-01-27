@@ -178,9 +178,15 @@ error:
 static PyArrayObject *weight_ensure_1dim_double_exists(PyObject *weight_obj, npy_intp length) {
     PyArrayObject *weight_arr;
     int weight_exist = weight_obj != Py_None;
+    int input_is_scalar = PyArray_IsAnyScalar(weight_obj);
 
     // attempt to build an array from the input
     if (weight_exist) {
+        if (input_is_scalar) {
+            PyObject *temp_tuple = PyTuple_Pack(1, weight_obj);
+            Py_DECREF(weight_obj);
+            weight_obj = temp_tuple;  // temporary tuple, must decref after use
+        }
         weight_arr = (PyArrayObject *)PyArray_FromAny(
             weight_obj,
             PyArray_DescrFromType(NPY_FLOAT64),
@@ -189,6 +195,9 @@ static PyArrayObject *weight_ensure_1dim_double_exists(PyObject *weight_obj, npy
             NPY_ARRAY_CARRAY_RO,  // allow direct buffer indexing for convenience
             NULL
         );
+        if (input_is_scalar) {
+            Py_DECREF(weight_obj);  // created a temporary tuple above
+        }
         if (weight_arr == NULL) {
             return NULL;
         }
@@ -523,7 +532,7 @@ static PyObject *PyBallTree_str(PyObject *self) {
     int n_bytes = snprintf(
         buffer,
         sizeof(buffer),
-        "BallTree(num_data=%ld, radius=%.3lf, center={%+.3lf, %+.3lf, %+.3lf})",
+        "BallTree(num_data=%ld, radius=%lf, center=(%lf, %lf, %lf))",
         tree->data->size,
         node->ball.radius,
         node->ball.x,
@@ -589,7 +598,6 @@ static PyObject *PyBallTree_count_radius(
     PyObject *args,
     PyObject *kwargs
 ) {
-    PyObject *py_counts = NULL;  // return value
     PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
     NpyIterHelper *xyz_iter = NULL;
 
@@ -600,7 +608,7 @@ static PyObject *PyBallTree_count_radius(
             args, kwargs, "Od|O", kwlist,
             &xyz_obj, &radius, &weight_obj)
     ) {
-        goto error;
+        return NULL;
     }
 
     // get an iterator for input data and accumulate counts
@@ -620,13 +628,15 @@ static PyObject *PyBallTree_count_radius(
         count += balltree_count_radius(self->balltree, &point, radius);
         ++idx;
     }
-    py_counts = PyFloat_FromDouble(count); 
+    return PyFloat_FromDouble(count); 
 
 error:
-    npyiterhelper_free(xyz_iter);
+    if (xyz_iter != NULL) {
+        npyiterhelper_free(xyz_iter);
+    }
     Py_XDECREF(xyz_arr);
     Py_XDECREF(weight_arr);
-    return py_counts;
+    return NULL;
 }
 
 static PyObject *PyBallTree_count_range(
@@ -634,7 +644,6 @@ static PyObject *PyBallTree_count_range(
     PyObject *args,
     PyObject *kwargs
 ) {
-    PyObject *py_counts = NULL;  // return value
     PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
     NpyIterHelper *xyz_iter = NULL;
 
@@ -645,7 +654,7 @@ static PyObject *PyBallTree_count_range(
             args, kwargs, "Odd|O", kwlist,
             &xyz_obj, &rmin, &rmax, &weight_obj)
     ) {
-        goto error;
+        return NULL;
     }
 
     // get an iterator for input data and accumulate counts
@@ -665,13 +674,15 @@ static PyObject *PyBallTree_count_range(
         count += balltree_count_range(self->balltree, &point, rmin, rmax);
         ++idx;
     }
-    py_counts = PyFloat_FromDouble(count); 
+    return PyFloat_FromDouble(count); 
 
 error:
-    npyiterhelper_free(xyz_iter);
+    if (xyz_iter != NULL) {
+        npyiterhelper_free(xyz_iter);
+    }
     Py_XDECREF(xyz_arr);
     Py_XDECREF(weight_arr);
-    return py_counts;
+    return NULL;
 }
 
 static PyObject *PyBallTree_dualcount_radius(PyBallTree *self, PyObject *args) {
@@ -745,7 +756,7 @@ static PyMethodDef PyBallTree_methods[] = {
     // constructors
     {
         .ml_name = "from_random",
-        .ml_meth = (PyCFunction)PyBallTree_from_random,
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_from_random,
         .ml_flags = METH_CLASS | METH_VARARGS | METH_KEYWORDS,
         .ml_doc = from_random__doc__
     },
@@ -776,13 +787,13 @@ static PyMethodDef PyBallTree_methods[] = {
     },
     {
         .ml_name = "count_radius",
-        .ml_meth = (PyCFunction)PyBallTree_count_radius,
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_radius,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
         .ml_doc = "Count pairs within a radius"
     },
     {
         .ml_name = "count_range",
-        .ml_meth = (PyCFunction)PyBallTree_count_range,
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_range,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
         .ml_doc = "Count pairs within a range"
     },
