@@ -44,7 +44,7 @@ Below are two examples that illustrate how to use the ball tree from `C` and
 #include "balltree.h"  // balltree_build, balltree_count_radius
 
 int main(int argc, char** argv) {
-    // uniform random points in range [-1, 1)
+    // uniform random points with (x, y, z) coordinates in range [-1, 1)
     int n_data = 1000000;
     srand(12345);  // seed random generator
     PointBuffer *points = ptbuf_gen_random(-1.0, 1.0, n_data);
@@ -69,15 +69,13 @@ int main(int argc, char** argv) {
 import numpy as np
 from balltree import BallTree
 
-# uniform random points in range [-1, 1)
+# uniform random points with (x, y, z) coordinates in range [-1, 1)
 n_data = 1_000_000
 rng = np.random.default_rng(12345)
-x = rng.uniform(-1.0, 1.0, size=n_data)
-y = rng.uniform(-1.0, 1.0, size=n_data)
-z = rng.uniform(-1.0, 1.0, size=n_data)
+points = rng.uniform(-1.0, 1.0, size=(n_data, 3))
 
 # build tree from points with default leaf size
-tree = BallTree(x, y, z)
+tree = BallTree(points)
 
 # query a single point
 query_point = [0.0, 0.0, 0.0]

@@ -2,9 +2,6 @@
 
 ## Fixes
 
-- Implement a single method for python that can query one point or multiple
-  points, switching automatically to dualtree
-- Clean up the python code with concepts from the example.c file
 - Add the doc strings with PyDoc_STRVAR and alikes
 
 ## New features

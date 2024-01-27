@@ -21,10 +21,9 @@ static NpyIterHelper *npyiterhelper_new(PyArrayObject *xyz_arr);
 static void npyiterhelper_free(NpyIterHelper *iter);
 static inline int iter_get_next_xyz(NpyIterHelper *iter, double *x, double *y, double *z);
 static const char *PyString_to_char(PyObject* py_string);
-static Point *point_from_PyIter(PyObject *point_iter, double weight);
 static PyArrayObject *xyz_ensure_2dim_double(PyObject *xyz_obj);
 static PyArrayObject *weight_ensure_1dim_double_exists(PyObject *weight_obj, npy_intp length);
-static PointBuffer *ptbuf_from_xyz_weight_arr(PyArrayObject *xyz_arr, PyArrayObject *weight_arr);
+static int parse_xyz_weight_as_npyiter(PyObject **xyz_obj, PyObject **weight_obj, PyArrayObject **xyz_arr, PyArrayObject **weight_arr, NpyIterHelper **iter);
 static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj);
 static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer);
 static PyObject *statvec_get_numpy_array(StatsVector *vec);
@@ -130,41 +129,6 @@ static const char *PyString_to_char(PyObject* py_string) {
     return string;
 }
 
-static Point *point_from_PyIter(PyObject *coord_iter, double weight) {
-    // check the input to be an iterator with size 3
-    const char err_msg[] = "expected a sequence with length 3";
-    PyObject *coord_seq = PySequence_Fast(coord_iter, err_msg);
-    if (coord_seq == NULL) {
-        goto error;
-    }
-    Py_ssize_t seq_length = PySequence_Fast_GET_SIZE(coord_seq);
-    if (seq_length != 3) {
-        PyErr_SetString(PyExc_ValueError, err_msg);
-        goto error;
-    }
-
-    // create the point instance from the python sequence
-    Point *point = malloc(sizeof(Point));
-    if (point == NULL) {
-        PyErr_SetString(PyExc_MemoryError, "failed to allocate Point");
-        goto error;
-    }
-    point->x = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(coord_seq, 0));
-    point->y = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(coord_seq, 1));
-    point->z = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(coord_seq, 2));
-    point->weight = weight;
-    if (PyErr_Occurred()) {
-        free(point);
-        goto error;
-    }
-
-    return point;
-
-error:
-    Py_XDECREF(coord_seq);
-    return NULL;
-}
-
 static PyArrayObject *xyz_ensure_2dim_double(PyObject *xyz_obj) {
     PyArrayObject *xyz_arr = (PyArrayObject *)PyArray_FromAny(
         xyz_obj,
@@ -252,52 +216,64 @@ static PyArrayObject *weight_ensure_1dim_double_exists(PyObject *weight_obj, npy
     return weight_arr;
 }
 
-static PointBuffer *ptbuf_from_xyz_weight_arr(PyArrayObject *xyz_arr, PyArrayObject *weight_arr) {
-    long size = PyArray_DIM(xyz_arr, 0);
-    PointBuffer *buffer = ptbuf_new(size);
-    if (buffer == NULL) {
-        return NULL;
+static int parse_xyz_weight_as_npyiter(
+    PyObject **xyz_obj,
+    PyObject **weight_obj,
+    PyArrayObject **xyz_arr,
+    PyArrayObject **weight_arr,
+    NpyIterHelper **iter
+) {
+    // ensure inputs are numpy arrays of the correct type and shape
+    *xyz_arr = xyz_ensure_2dim_double(*xyz_obj);
+    if (*xyz_arr == NULL) {
+        return -1;
+    }
+    npy_intp length = PyArray_DIM(*xyz_arr, 0);
+    if (length == 0) {
+        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
+        return -1;
+    }
+    *weight_arr = weight_ensure_1dim_double_exists(*weight_obj, length);
+    if (*weight_arr == NULL) {
+        return -1;
     }
 
-    // fill buffer it with the provided data
-    NpyIterHelper *xyz_iter = npyiterhelper_new(xyz_arr);
-    if (xyz_iter == NULL) {
-        ptbuf_free(buffer);
-        return NULL;
-    }
-    double x, y, z;
-    double *weight_buffer = PyArray_DATA(weight_arr);
-
-    long idx = 0;
-    while (iter_get_next_xyz(xyz_iter, &x, &y, &z)) {
-        buffer->points[idx] = (Point){x, y, z, weight_buffer[idx]};
-        ++idx;
+    // build an iterator for the xyz array
+    *iter = npyiterhelper_new(*xyz_arr);
+    if (*iter == NULL) {
+        return -1;
     }
 
-    npyiterhelper_free(xyz_iter);
-    return buffer;
+    return 0;
 }
 
 static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj) {
     PointBuffer *buffer = NULL;  // return value
     PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
+    NpyIterHelper *xyz_iter = NULL;
 
-    xyz_arr = xyz_ensure_2dim_double(xyz_obj);
-    if (xyz_arr == NULL) {
+    // get an iterator for input data
+    if (parse_xyz_weight_as_npyiter(
+            &xyz_obj, &weight_obj,
+            &xyz_arr, &weight_arr,
+            &xyz_iter) < 0
+    ) {
         goto error;
     }
+    double x, y, z;
+    double *weight_buffer = PyArray_DATA(weight_arr);
+
+    // build and fill point buffer
     npy_intp length = PyArray_DIM(xyz_arr, 0);
-    if (length == 0) {
-        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
+    buffer = ptbuf_new(length);
+    if (buffer == NULL) {
         goto error;
     }
-
-    weight_arr = weight_ensure_1dim_double_exists(weight_obj, length);
-    if (weight_arr == NULL) {
-        goto error;
+    long idx = 0;
+    while (iter_get_next_xyz(xyz_iter, &x, &y, &z)) {
+        buffer->points[idx] = (Point){x, y, z, weight_buffer[idx]};
+        ++idx;
     }
-
-    buffer = ptbuf_from_xyz_weight_arr(xyz_arr, weight_arr);
 
 error:
     Py_XDECREF(xyz_arr);
@@ -613,24 +589,44 @@ static PyObject *PyBallTree_count_radius(
     PyObject *args,
     PyObject *kwargs
 ) {
-    static char *kwlist[] = {"point", "radius", "weight", NULL};
-    PyObject *coord_iter;
+    PyObject *py_counts = NULL;  // return value
+    PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
+    NpyIterHelper *xyz_iter = NULL;
+
+    static char *kwlist[] = {"xyz", "radius", "weight", NULL};
+    PyObject *xyz_obj, *weight_obj = Py_None;
     double radius;
-    double weight = 1.0;  // weight is optional
     if (!PyArg_ParseTupleAndKeywords(
-            args, kwargs, "Od|d", kwlist,
-            &coord_iter, &radius, &weight)
+            args, kwargs, "Od|O", kwlist,
+            &xyz_obj, &radius, &weight_obj)
     ) {
-        return NULL;
-    }
-    Point *point = point_from_PyIter(coord_iter, weight);
-    if (point == NULL) {
-        return NULL;
+        goto error;
     }
 
-    double count = balltree_count_radius(self->balltree, point, radius);
-    free(point);
-    return PyFloat_FromDouble(count);
+    // get an iterator for input data and accumulate counts
+    double count = 0.0;
+    if (parse_xyz_weight_as_npyiter(
+            &xyz_obj, &weight_obj,
+            &xyz_arr, &weight_arr,
+            &xyz_iter) < 0
+    ) {
+        goto error;
+    }
+    double *weight_buffer = PyArray_DATA(weight_arr);
+    long idx = 0;
+    Point point;
+    while (iter_get_next_xyz(xyz_iter, &point.x, &point.y, &point.z)) {
+        point.weight = weight_buffer[idx];
+        count += balltree_count_radius(self->balltree, &point, radius);
+        ++idx;
+    }
+    py_counts = PyFloat_FromDouble(count); 
+
+error:
+    npyiterhelper_free(xyz_iter);
+    Py_XDECREF(xyz_arr);
+    Py_XDECREF(weight_arr);
+    return py_counts;
 }
 
 static PyObject *PyBallTree_count_range(
@@ -638,24 +634,44 @@ static PyObject *PyBallTree_count_range(
     PyObject *args,
     PyObject *kwargs
 ) {
+    PyObject *py_counts = NULL;  // return value
+    PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
+    NpyIterHelper *xyz_iter = NULL;
+
     static char *kwlist[] = {"point", "rmin", "rmax", "weight", NULL};
-    PyObject *coord_iter;
+    PyObject *xyz_obj, *weight_obj = Py_None;
     double rmin, rmax;
-    double weight = 1.0;  // weight is optional
     if (!PyArg_ParseTupleAndKeywords(
-            args, kwargs, "Odd|d", kwlist,
-            &coord_iter, &rmin, &rmax, &weight)
+            args, kwargs, "Odd|O", kwlist,
+            &xyz_obj, &rmin, &rmax, &weight_obj)
     ) {
-        return NULL;
-    }
-    Point *point = point_from_PyIter(coord_iter, weight);
-    if (point == NULL) {
-        return NULL;
+        goto error;
     }
 
-    double count = balltree_count_range(self->balltree, point, rmin, rmax);
-    free(point);
-    return PyFloat_FromDouble(count);
+    // get an iterator for input data and accumulate counts
+    double count = 0.0;
+    if (parse_xyz_weight_as_npyiter(
+            &xyz_obj, &weight_obj,
+            &xyz_arr, &weight_arr,
+            &xyz_iter) < 0
+    ) {
+        goto error;
+    }
+    double *weight_buffer = PyArray_DATA(weight_arr);
+    long idx = 0;
+    Point point;
+    while (iter_get_next_xyz(xyz_iter, &point.x, &point.y, &point.z)) {
+        point.weight = weight_buffer[idx];
+        count += balltree_count_range(self->balltree, &point, rmin, rmax);
+        ++idx;
+    }
+    py_counts = PyFloat_FromDouble(count); 
+
+error:
+    npyiterhelper_free(xyz_iter);
+    Py_XDECREF(xyz_arr);
+    Py_XDECREF(weight_arr);
+    return py_counts;
 }
 
 static PyObject *PyBallTree_dualcount_radius(PyBallTree *self, PyObject *args) {
