@@ -15,10 +15,10 @@ balltree = Extension(
     ],
     include_dirs=["include", np.get_include()],
     extra_compile_args=[
+        "-Wall",
         "-O3",
         "-ffast-math",
         "-march=native",
-        "-funroll-all-loops",
         "-DSET_PYERR_STRING",  # required to propagate C errors to python
     ],
 )
