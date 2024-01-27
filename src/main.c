@@ -9,7 +9,6 @@
 PointBuffer *load_data_from_file(const char *filepath);
 
 int main(int argc, char** argv) {
-    Point query_point;
     double query_radius = 0.2;
     int leafsize = 20;
 
@@ -32,8 +31,6 @@ int main(int argc, char** argv) {
     int n_records = buffer->size;
     printf("read %'d records in %.3lf sec\n", n_records, elapsed);
 
-    query_point = buffer->points[0];
-
     // build the ball tree, show the elapsed time
     time = clock();
     tree = balltree_build_leafsize(buffer, leafsize);
@@ -48,9 +45,10 @@ int main(int argc, char** argv) {
     // query point at fixed radius, show the elapsed time
     int imax = 1;
     while (imax <= 100) {
+        count = 0;
         time = clock();
         for (int i = 0; i < imax ; ++i)
-            count = balltree_count_radius(tree, &query_point, query_radius);
+            count += balltree_count_radius(tree, buffer->points + i, query_radius);
         elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
         printf("%3dx found %11.0lf pairs in %7.3lf ms\n", imax, count, elapsed);
         imax *= 10;
