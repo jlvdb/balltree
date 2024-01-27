@@ -12,7 +12,7 @@ static PointBuffer *ptbuf_read(long n_items, FILE *file);
 typedef struct {
     BallNode *nodes;
     size_t next_free;
-    long size;
+    size_t size;
 } BNodeBuffer;
 
 static BNodeBuffer *bnodebuffer_new(long size);
