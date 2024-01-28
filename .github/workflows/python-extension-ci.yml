@@ -32,7 +32,7 @@ jobs:
   
     - name: Build Python extension
       run: |
-        python setup.py build_ext --inplace
+        python -m pip install -e .
 
     - name: Run tests with pytest
       run: |
