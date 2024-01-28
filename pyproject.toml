@@ -24,6 +24,12 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest",]
+dev = [
+    "balltree[test]",
+    "isort",
+    "black",
+    "flake8",
+]
 
 [tool.setuptools.dynamic]
 version = {attr = "balltree.__version__"}
@@ -33,3 +39,22 @@ where = ["."]
 
 [tool.pytest.ini_options]
 testpaths = ["tests",]
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+include = ".pyi?$"
+exclude = """
+/(
+    .git
+    | .hg
+    | .mypy_cache
+    | .tox
+    | .venv
+    | _build
+    | buck-out
+    | build
+    | dist
+)/
+"""
