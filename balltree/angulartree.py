@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -32,6 +34,10 @@ def radec_to_xyz(radec: NDArray[np.float64]) -> NDArray[np.float64]:
     return xyz
 
 
+def angle_to_radius(angle: float) -> float:
+    return 2.0 * np.sin(angle / 2.0)
+
+
 class AngularTree:
     _tree: BallTree
 
@@ -45,31 +51,38 @@ class AngularTree:
         self._tree = BallTree(xyz, weight, leafsize=leafsize)
 
     @property
-    def data(self):
+    def data(self) -> NDArray[np.float64]:
         return self._tree.data
 
     @property
-    def num_data(self):
+    def num_data(self) -> int:
         return self._tree.num_data
 
     @property
-    def leafsize(self):
+    def leafsize(self) -> int:
         return self._tree.leafsize
 
     @property
-    def sum_weight(self):
+    def sum_weight(self) -> float:
         return self._tree.sum_weight
 
     @property
-    def center(self):
+    def center(self) -> tuple(float, float, float):
         return self._tree.center
 
     @property
-    def radius(self):
+    def radius(self) -> float:
         return self._tree.radius
 
     @classmethod
-    def from_random(cls, ra_min, ra_max, dec_min, dec_max, size):
+    def from_random(
+        cls,
+        ra_min: float,
+        ra_max: float,
+        dec_min: float,
+        dec_max: float,
+        size: int,
+    ) -> AngularTree:
         x_min, y_min = radec_to_xy(ra_min, dec_min)
         x_max, y_max = radec_to_xy(ra_max, dec_max)
         x = np.random.uniform(x_min, x_max, size)
@@ -78,36 +91,56 @@ class AngularTree:
         return cls(radec)
 
     @classmethod
-    def from_file(cls, fpath):
+    def from_file(cls, fpath: str) -> AngularTree:
         new = AngularTree.__new__(AngularTree)
         new._tree = BallTree.from_file(fpath)
         return new
 
-    def to_file(self, fpath):
-        return self._tree.to_file(fpath)
+    def to_file(self, fpath: str) -> None:
+        self._tree.to_file(fpath)
 
-    def count_nodes(self):
+    def count_nodes(self) -> int:
         return self._tree.count_nodes()
 
-    def get_node_data(self):
+    def get_node_data(self) -> NDArray:
         return self._tree.get_node_data()
 
-    def count_radius(self, radec, angle, weight=None):
+    def count_radius(
+        self,
+        radec: NDArray[np.float64],
+        angle: float,
+        weight: NDArray[np.float64] | None = None,
+    ) -> float:
         xyz = radec_to_xyz(radec)
-        radius = 2.0 * np.sin(angle / 2.0)
+        radius = angle_to_radius(angle)
         return self._tree.count_radius(xyz, radius, weight)
 
-    def count_range(self, radec, ang_min, ang_max, weight=None):
+    def count_range(
+        self,
+        radec: NDArray[np.float64],
+        ang_min: float,
+        ang_max: float,
+        weight: NDArray[np.float64] | None = None,
+    ) -> float:
         xyz = radec_to_xyz(radec)
-        rmin = 2.0 * np.sin(ang_min / 2.0)
-        rmax = 2.0 * np.sin(ang_max / 2.0)
+        rmin = angle_to_radius(ang_min)
+        rmax = angle_to_radius(ang_max)
         return self._tree.count_range(xyz, rmin, rmax, weight)
 
-    def dualcount_radius(self, other, angle):
-        radius = 2.0 * np.sin(angle / 2.0)
+    def dualcount_radius(
+        self,
+        other: AngularTree,
+        angle: float,
+    ) -> float:
+        radius = angle_to_radius(angle)
         return self._tree.dualcount_radius(other, radius)
 
-    def dualcount_range(self, other, ang_min, ang_max):
-        rmin = 2.0 * np.sin(ang_min / 2.0)
-        rmax = 2.0 * np.sin(ang_max / 2.0)
-        return self._tree.dualcount_range(other, ang_min, ang_max)
+    def dualcount_range(
+        self,
+        other: AngularTree,
+        ang_min: float,
+        ang_max: float,
+    ) -> float:
+        rmin = angle_to_radius(ang_min)
+        rmax = angle_to_radius(ang_max)
+        return self._tree.dualcount_range(other, rmin, rmax)
