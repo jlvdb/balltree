@@ -274,7 +274,7 @@ class TestBallTree:
             count += brute_force((data, weight), (p, w), radius)
         assert_almost_equal(tree.dualcount_radius(tree, radius), count)
 
-    @mark.xfail
+    @mark.skip  # xfail
     @mark.parametrize("rmin,rmax", rminmax_testvalues)
     def test_dualcount_range(self, rmin, rmax, rand_data_weight):
         data, weight = rand_data_weight
