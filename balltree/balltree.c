@@ -159,6 +159,7 @@ static PyArrayObject *xyz_ensure_2dim_double(PyObject *xyz_obj) {
             }
         } else {
             PyErr_SetString(PyExc_ValueError, dim_err_msg);
+            goto error;
         }
     }
 
@@ -195,9 +196,6 @@ static PyArrayObject *weight_ensure_1dim_double_exists(PyObject *weight_obj, npy
             NPY_ARRAY_CARRAY_RO,  // allow direct buffer indexing for convenience
             NULL
         );
-        if (input_is_scalar) {
-            Py_DECREF(weight_obj);  // created a temporary tuple above
-        }
         if (weight_arr == NULL) {
             return NULL;
         }
@@ -628,6 +626,10 @@ static PyObject *PyBallTree_count_radius(
         count += balltree_count_radius(self->balltree, &point, radius);
         ++idx;
     }
+
+    npyiterhelper_free(xyz_iter);
+    Py_XDECREF(xyz_arr);
+    Py_XDECREF(weight_arr);
     return PyFloat_FromDouble(count); 
 
 error:
@@ -647,7 +649,7 @@ static PyObject *PyBallTree_count_range(
     PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
     NpyIterHelper *xyz_iter = NULL;
 
-    static char *kwlist[] = {"point", "rmin", "rmax", "weight", NULL};
+    static char *kwlist[] = {"xyz", "rmin", "rmax", "weight", NULL};
     PyObject *xyz_obj, *weight_obj = Py_None;
     double rmin, rmax;
     if (!PyArg_ParseTupleAndKeywords(
@@ -674,6 +676,10 @@ static PyObject *PyBallTree_count_range(
         count += balltree_count_range(self->balltree, &point, rmin, rmax);
         ++idx;
     }
+
+    npyiterhelper_free(xyz_iter);
+    Py_XDECREF(xyz_arr);
+    Py_XDECREF(weight_arr);
     return PyFloat_FromDouble(count); 
 
 error:
@@ -859,6 +865,9 @@ PyMODINIT_FUNC PyInit__balltree(void) {
         Py_DECREF(module);
         return NULL;
     }
-
+    if (PyModule_AddIntConstant(module, "default_leafsize", DEFAULT_LEAFSIZE) < -1) {
+        Py_DECREF(module);
+        return NULL;
+    }
     return module;
 }
