@@ -214,14 +214,12 @@ class TestBallTree:
         assert orig.count_nodes() == restored.count_nodes()
         assert_array_equal(orig.data, restored.data)
 
-    @mark.skip
     def test_count_radius_no_radius(self, rand_data_weight):
         data, _ = rand_data_weight
         tree = BallTree(data)
         with raises(TypeError):
             tree.count_radius(data[0])
 
-    @mark.skip
     @mark.parametrize("radius", radius_testvalues)
     def test_count_radius_single(self, radius, rand_data_weight):
         data, _ = rand_data_weight
@@ -233,18 +231,16 @@ class TestBallTree:
         count = brute_force((data, weight), (p, w), radius)
         assert_almost_equal(tree.count_radius(p, radius), count)
 
-    @mark.skip
     @mark.parametrize("radius", radius_testvalues)
     def test_count_radius_single_weight(self, radius, rand_data_weight):
         data, weight = rand_data_weight
         tree = BallTree(data, weight)
 
         p = data[0]
-        w = weight[0]
+        w = float(weight[0])
         count = brute_force((data, weight), (p, w), radius)
         assert_almost_equal(tree.count_radius(p, radius, weight=w), count)
 
-    @mark.skip
     @mark.parametrize("radius", radius_testvalues)
     def test_count_radius_multi(self, radius, rand_data_weight):
         data, weight = rand_data_weight
@@ -252,17 +248,17 @@ class TestBallTree:
 
         count = 0.0
         for p, w in zip(data, weight):
-            count += brute_force((data, weight), (p, w), radius)
+            count += brute_force((data, weight), (p, float(w)), radius)
         assert_almost_equal(tree.count_radius(data, radius, weight), count)
 
-    @mark.skip  # xfail
+    @mark.xfail
     @mark.parametrize("rmin,rmax", rminmax_testvalues)
     def test_count_range_single(self, rmin, rmax, rand_data_weight):
         data, weight = rand_data_weight
         tree = BallTree(data, weight)
 
         p = data[0]
-        w = weight[0]
+        w = float(weight[0])
         count = brute_force((data, weight), (p, w), rmax) - brute_force(
             (data, weight), (p, w), rmin
         )
@@ -278,7 +274,7 @@ class TestBallTree:
             count += brute_force((data, weight), (p, w), radius)
         assert_almost_equal(tree.dualcount_radius(tree, radius), count)
 
-    @mark.skip  # xfail
+    @mark.xfail
     @mark.parametrize("rmin,rmax", rminmax_testvalues)
     def test_dualcount_range(self, rmin, rmax, rand_data_weight):
         data, weight = rand_data_weight
@@ -287,7 +283,7 @@ class TestBallTree:
 
         count = 0.0
         for p, w in zip(data, weight):
-            count += brute_force((data, weight), (p, w), rmax) - brute_force(
+            count += brute_force((data, weight), (p, float(w)), rmax) - brute_force(
                 (data, weight), (p, w), rmin
             )
         assert_almost_equal(tree.dualcount_range(tree, rmin, rmax), count)
