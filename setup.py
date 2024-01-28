@@ -1,5 +1,5 @@
-from setuptools import setup, Extension
 import numpy as np
+from setuptools import Extension, setup
 
 balltree = Extension(
     name="balltree._balltree",
@@ -26,5 +26,4 @@ balltree = Extension(
 if __name__ == "__main__":
     setup(
         ext_modules=[balltree],
-        url="https://github.com/jlvdb/balltree.git",
     )
