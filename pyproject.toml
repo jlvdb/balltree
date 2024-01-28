@@ -41,7 +41,7 @@ documentation = "https://balltree.readthedocs.io/"
 test = [
     "pytest",
 ]
-doc = [
+docs = [
     "sphinx",
     "sphinx-design",
     "sphinx-copybutton",
@@ -49,7 +49,7 @@ doc = [
 ]
 dev = [
     "balltree[test]",
-    "balltree[doc]",
+    "balltree[docs]",
     "isort",
     "black",
     "flake8",
