@@ -23,12 +23,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest",]
+test = [
+    "pytest",
+]
 dev = [
     "balltree[test]",
     "isort",
     "black",
     "flake8",
+    "pre-commit",
 ]
 
 [tool.setuptools.dynamic]
@@ -38,7 +41,9 @@ version = {attr = "balltree.__version__"}
 where = ["."]
 
 [tool.pytest.ini_options]
-testpaths = ["tests",]
+testpaths = [
+    "tests",
+]
 
 [tool.isort]
 profile = "black"

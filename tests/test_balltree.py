@@ -1,10 +1,8 @@
+import numpy as np
+from numpy.testing import assert_almost_equal, assert_array_equal
 from pytest import fixture, mark, raises
 
-import numpy as np
-from numpy.testing import assert_array_equal, assert_almost_equal
-
 from balltree import BallTree, default_leafsize
-
 
 radius_testvalues = [0.01, 0.1, 1.0, 2.0]
 rminmax_testvalues = [(0.1, 0.2), (1.0, 2.0), (2.0, 3.0)]
@@ -13,15 +11,17 @@ rminmax_testvalues = [(0.1, 0.2), (1.0, 2.0), (2.0, 3.0)]
 @fixture
 def mock_data():
     # NOTE: if values are changed, mock_radius changes
-    return np.array([
-        [5.1, 5.2, 5.3],
-        [6.1, 6.2, 6.3],
-        [7.1, 7.2, 7.3],
-        [3.1, 3.2, 3.3],
-        [2.1, 2.2, 2.3],
-        [4.1, 4.2, 4.3],  # median
-        [1.1, 1.2, 1.3],
-    ])
+    return np.array(
+        [
+            [5.1, 5.2, 5.3],
+            [6.1, 6.2, 6.3],
+            [7.1, 7.2, 7.3],
+            [3.1, 3.2, 3.3],
+            [2.1, 2.2, 2.3],
+            [4.1, 4.2, 4.3],  # median
+            [1.1, 1.2, 1.3],
+        ]
+    )
 
 
 @fixture
@@ -48,10 +48,7 @@ def mock_radius():
 def rand_data_weight():
     rng = np.random.default_rng(12345)
     size = 1000
-    return (
-        rng.uniform(-1.0, 1.0, size=(size, 3)),
-        rng.normal(1.0, 0.02, size)
-    )
+    return (rng.uniform(-1.0, 1.0, size=(size, 3)), rng.normal(1.0, 0.02, size))
 
 
 def data_to_view(data, weight=True):
@@ -67,7 +64,7 @@ def data_to_view(data, weight=True):
 
 def euclidean_distance(points, tpoint):
     diff = points - tpoint[np.newaxis, :]
-    diffsq = diff ** 2
+    diffsq = diff**2
     return np.sqrt(diffsq.sum(axis=1))
 
 
@@ -99,17 +96,11 @@ class TestBallTree:
         assert tree.leafsize == default_leafsize
         assert tree.num_data == 1
         assert tree.count_nodes() == 1
-        assert_array_equal(
-            tree.data,
-            data_to_view(mock_data_median)
-        )
+        assert_array_equal(tree.data, data_to_view(mock_data_median))
 
     def test_init_single_list(self, mock_data_median):
         tree = BallTree(mock_data_median.tolist())
-        assert_array_equal(
-            tree.data,
-            data_to_view(mock_data_median)
-        )
+        assert_array_equal(tree.data, data_to_view(mock_data_median))
 
     def test_init_single_wrong_shape(self, mock_data_median):
         with raises(ValueError, match="shape"):
@@ -118,34 +109,22 @@ class TestBallTree:
     def test_init_single_weight(self, mock_data_median):
         weight = np.array([0.5])
         tree = BallTree(mock_data_median, weight)
-        assert_array_equal(
-            tree.data,
-            data_to_view(mock_data_median, weight)
-        )
+        assert_array_equal(tree.data, data_to_view(mock_data_median, weight))
 
     def test_init_single_weight_kwarg(self, mock_data_median):
         weight = np.array([0.5])
         tree = BallTree(mock_data_median, weight=weight)
-        assert_array_equal(
-            tree.data,
-            data_to_view(mock_data_median, weight)
-        )
+        assert_array_equal(tree.data, data_to_view(mock_data_median, weight))
 
     def test_init_single_weight_list(self, mock_data_median):
         weight = [0.5]
         tree = BallTree(mock_data_median, weight)
-        assert_array_equal(
-            tree.data,
-            data_to_view(mock_data_median, weight)
-        )
+        assert_array_equal(tree.data, data_to_view(mock_data_median, weight))
 
     def test_init_single_weight_scalar(self, mock_data_median):
         weight = 0.5
         tree = BallTree(mock_data_median, weight)
-        assert_array_equal(
-            tree.data,
-            data_to_view(mock_data_median, [weight])
-        )
+        assert_array_equal(tree.data, data_to_view(mock_data_median, [weight]))
 
     def test_init_single_weight_wrong_shape(self, mock_data_median):
         with raises(ValueError, match="same length"):
@@ -158,10 +137,7 @@ class TestBallTree:
         assert tree.leafsize == default_leafsize
         assert tree.num_data == len(mock_data)
         assert tree.count_nodes() == 1
-        assert_array_equal(
-            tree.data,
-            data_to_view(mock_data)
-        )
+        assert_array_equal(tree.data, data_to_view(mock_data))
 
     def test_init_multi_two_childs(self, mock_data, mock_data_median):
         leafsize = 4
@@ -172,33 +148,23 @@ class TestBallTree:
         # check the partitioning
         pivot_x = mock_data_median[0]
         idx_pivot = tree.num_data // 2
-        assert_array_equal(
-            tree.data[idx_pivot],
-            data_to_view(mock_data_median)
-        )
+        assert_array_equal(tree.data[idx_pivot], data_to_view(mock_data_median))
         assert np.all(tree.data[:idx_pivot]["x"] <= pivot_x)
-        assert np.all(tree.data[idx_pivot+1:]["x"] >= pivot_x)
+        assert np.all(tree.data[idx_pivot + 1 :]["x"] >= pivot_x)
         # check the data elements where swapped correctly
-        assert_array_equal(
-            np.sort(tree.data),
-            np.sort(data_to_view(mock_data))
-        )
+        assert_array_equal(np.sort(tree.data), np.sort(data_to_view(mock_data)))
 
     def test_init_multi_wrong_shape(self, mock_data):
         with raises(ValueError, match="shape"):
             BallTree(mock_data[:, :-1])
 
     def test_init_multi_list(self, mock_data):
-        assert_array_equal(
-            BallTree(mock_data.tolist()).data,
-            BallTree(mock_data).data
-        )
+        assert_array_equal(BallTree(mock_data.tolist()).data, BallTree(mock_data).data)
 
     def test_init_multi_weight(self, mock_data, mock_weight):
         tree = BallTree(mock_data, mock_weight)
         assert_array_equal(
-            np.sort(tree.data, order="weight"),
-            data_to_view(mock_data, mock_weight)
+            np.sort(tree.data, order="weight"), data_to_view(mock_data, mock_weight)
         )
 
     def test_init_wrong_types(self):
@@ -224,10 +190,7 @@ class TestBallTree:
     @mark.xfail
     def test_chaining(self, mock_data):
         # this works if the order of the function arguments is reversed
-        assert_array_equal(
-            data_to_view(mock_data),
-            BallTree(mock_data).data
-        )
+        assert_array_equal(data_to_view(mock_data), BallTree(mock_data).data)
 
     def test_from_random(self):
         low = -2.0
@@ -288,7 +251,7 @@ class TestBallTree:
             count += brute_force((data, weight), (p, w), radius)
         assert_almost_equal(tree.count_radius(data, radius, weight), count)
 
-    @mark.xfail
+    @mark.skip  # xfail
     @mark.parametrize("rmin,rmax", rminmax_testvalues)
     def test_count_range_single(self, rmin, rmax, rand_data_weight):
         data, weight = rand_data_weight
@@ -296,9 +259,8 @@ class TestBallTree:
 
         p = data[0]
         w = weight[0]
-        count = (
-            brute_force((data, weight), (p, w), rmax)
-            - brute_force((data, weight), (p, w), rmin)
+        count = brute_force((data, weight), (p, w), rmax) - brute_force(
+            (data, weight), (p, w), rmin
         )
         assert_almost_equal(tree.count_range(p, rmin, rmax, weight=w), count)
 
@@ -321,9 +283,7 @@ class TestBallTree:
 
         count = 0.0
         for p, w in zip(data, weight):
-            count += (
-                brute_force((data, weight), (p, w), rmax)
-                - brute_force((data, weight), (p, w), rmin)
-
+            count += brute_force((data, weight), (p, w), rmax) - brute_force(
+                (data, weight), (p, w), rmin
             )
         assert_almost_equal(tree.dualcount_range(tree, rmin, rmax), count)
