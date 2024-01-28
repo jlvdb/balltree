@@ -1,6 +1,7 @@
 # balltree
 
 ![CI tests](https://github.com/jlvdb/balltree/actions/workflows/python-extension-ci.yml/badge.svg)
+[![Documentation Status](https://readthedocs.org/projects/balltree/badge/?version=latest)](https://balltree.readthedocs.io/en/latest/?badge=latest)
 
 Fast balltree implementation for 3-dim (weighted) data with an Euclidean
 distance norm. The base implementation is in `C` and there is a wrapper for
@@ -15,10 +16,10 @@ Range queries are typically 25-30x faster than the corresponding implementation
 in `scipy.spatial.KDTree` (see below).
 
 #### Contents
-[Installation](#installation)  
-[Usage](#usage)  
-[Comparison to scipy.spatial.KDTree](#comparison-to-scipyspatialkdtree)  
-[Maintainers](#aintainers)  
+[Installation](#installation)
+[Usage](#usage)
+[Comparison to scipy.spatial.KDTree](#comparison-to-scipyspatialkdtree)
+[Maintainers](#maintainers)
 
 
 ## Installation
