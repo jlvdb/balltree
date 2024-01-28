@@ -35,6 +35,7 @@ dependencies = [
 
 [project.urls]
 source = "https://github.com/jlvdb/balltree.git"
+documentation = "https://balltree.readthedocs.io/"
 
 [project.optional-dependencies]
 test = [

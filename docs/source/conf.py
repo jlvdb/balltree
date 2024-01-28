@@ -3,10 +3,18 @@
 # -- Path setup --------------------------------------------------------------
 
 import os
-import sys
 
-sys.path.insert(0, os.path.abspath("../../"))
-import balltree  # noqa: E402
+try:
+    try:  # user has installed the package
+        import balltree
+    except ImportError:  # try local package location
+        import sys
+
+        sys.path.insert(0, os.path.abspath("../.."))
+        import balltree
+except ImportError as e:
+    if "core._math" in e.args[0]:
+        raise RuntimeError("balltree must be compiled") from e
 
 # -- Project information -----------------------------------------------------
 
