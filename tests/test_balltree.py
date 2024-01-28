@@ -6,6 +6,10 @@ from numpy.testing import assert_array_equal, assert_almost_equal
 from balltree import BallTree, default_leafsize
 
 
+radius_testvalues = [0.01, 0.1, 1.0, 2.0]
+rminmax_testvalues = [(0.1, 0.2), (1.0, 2.0), (2.0, 3.0)]
+
+
 @fixture
 def mock_data():
     # NOTE: if values are changed, mock_radius changes
@@ -253,10 +257,10 @@ class TestBallTree:
         with raises(TypeError):
             tree.count_radius(data[0])
 
-    def test_count_radius_single(self, rand_data_weight):
+    @mark.parametrize("radius", radius_testvalues)
+    def test_count_radius_single(self, radius, rand_data_weight):
         data, _ = rand_data_weight
         weight = np.ones(len(data))
-        radius = 0.2
         tree = BallTree(data)
 
         p = data[0]
@@ -264,9 +268,9 @@ class TestBallTree:
         count = brute_force((data, weight), (p, w), radius)
         assert_almost_equal(tree.count_radius(p, radius), count)
 
-    def test_count_radius_single_weight(self, rand_data_weight):
+    @mark.parametrize("radius", radius_testvalues)
+    def test_count_radius_single_weight(self, radius, rand_data_weight):
         data, weight = rand_data_weight
-        radius = 0.2
         tree = BallTree(data, weight)
 
         p = data[0]
@@ -274,9 +278,9 @@ class TestBallTree:
         count = brute_force((data, weight), (p, w), radius)
         assert_almost_equal(tree.count_radius(p, radius, weight=w), count)
 
-    def test_count_radius_multi(self, rand_data_weight):
+    @mark.parametrize("radius", radius_testvalues)
+    def test_count_radius_multi(self, radius, rand_data_weight):
         data, weight = rand_data_weight
-        radius = 0.2
         tree = BallTree(data, weight)
 
         count = 0.0
@@ -285,9 +289,9 @@ class TestBallTree:
         assert_almost_equal(tree.count_radius(data, radius, weight), count)
 
     @mark.xfail
-    def test_count_range_single(self, rand_data_weight):
+    @mark.parametrize("rmin,rmax", rminmax_testvalues)
+    def test_count_range_single(self, rmin, rmax, rand_data_weight):
         data, weight = rand_data_weight
-        rmin, rmax = 0.1, 0.2
         tree = BallTree(data, weight)
 
         p = data[0]
@@ -298,9 +302,9 @@ class TestBallTree:
         )
         assert_almost_equal(tree.count_range(p, rmin, rmax, weight=w), count)
 
-    def test_dualcount_radius(self, rand_data_weight):
+    @mark.parametrize("radius", radius_testvalues)
+    def test_dualcount_radius(self, radius, rand_data_weight):
         data, weight = rand_data_weight
-        radius = 0.2
         tree = BallTree(data, weight)
 
         count = 0.0
@@ -309,7 +313,8 @@ class TestBallTree:
         assert_almost_equal(tree.dualcount_radius(tree, radius), count)
 
     @mark.xfail
-    def test_dualcount_range(self, rand_data_weight):
+    @mark.parametrize("rmin,rmax", rminmax_testvalues)
+    def test_dualcount_range(self, rmin, rmax, rand_data_weight):
         data, weight = rand_data_weight
         rmin, rmax = 0.1, 0.2
         tree = BallTree(data, weight)
