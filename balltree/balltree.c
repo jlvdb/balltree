@@ -180,11 +180,15 @@ static PyArrayObject *weight_ensure_1dim_double_exists(PyObject *weight_obj, npy
     PyArrayObject *weight_arr;
     int weight_exist = weight_obj != Py_None;
     int input_is_scalar = PyArray_IsAnyScalar(weight_obj);
+    PyObject *temp_tuple = NULL;
 
     // attempt to build an array from the input
     if (weight_exist) {
         if (input_is_scalar) {
-            PyObject *temp_tuple = PyTuple_Pack(1, weight_obj);
+            PyObject *temp_tuple = Py_BuildValue("(O)", weight_obj);
+            if (temp_tuple == NULL) {
+                return NULL;
+            }
             Py_DECREF(weight_obj);
             weight_obj = temp_tuple;  // temporary tuple, must decref after use
         }
@@ -196,6 +200,7 @@ static PyArrayObject *weight_ensure_1dim_double_exists(PyObject *weight_obj, npy
             NPY_ARRAY_CARRAY_RO,  // allow direct buffer indexing for convenience
             NULL
         );
+        Py_XDECREF(temp_tuple);
         if (weight_arr == NULL) {
             return NULL;
         }
@@ -205,7 +210,7 @@ static PyArrayObject *weight_ensure_1dim_double_exists(PyObject *weight_obj, npy
             return NULL;
         }
     }
-    
+
     // create an empty array initialised to 1.0
     else {
         npy_intp weight_shape[1] = {length};
@@ -630,7 +635,7 @@ static PyObject *PyBallTree_count_radius(
     npyiterhelper_free(xyz_iter);
     Py_XDECREF(xyz_arr);
     Py_XDECREF(weight_arr);
-    return PyFloat_FromDouble(count); 
+    return PyFloat_FromDouble(count);
 
 error:
     if (xyz_iter != NULL) {
@@ -680,7 +685,7 @@ static PyObject *PyBallTree_count_range(
     npyiterhelper_free(xyz_iter);
     Py_XDECREF(xyz_arr);
     Py_XDECREF(weight_arr);
-    return PyFloat_FromDouble(count); 
+    return PyFloat_FromDouble(count);
 
 error:
     if (xyz_iter != NULL) {

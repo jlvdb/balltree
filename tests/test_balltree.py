@@ -237,7 +237,7 @@ class TestBallTree:
         tree = BallTree(data, weight)
 
         p = data[0]
-        w = float(weight[0])
+        w = weight[0]
         count = brute_force((data, weight), (p, w), radius)
         assert_almost_equal(tree.count_radius(p, radius, weight=w), count)
 
@@ -248,7 +248,7 @@ class TestBallTree:
 
         count = 0.0
         for p, w in zip(data, weight):
-            count += brute_force((data, weight), (p, float(w)), radius)
+            count += brute_force((data, weight), (p, w), radius)
         assert_almost_equal(tree.count_radius(data, radius, weight), count)
 
     @mark.xfail
@@ -258,7 +258,7 @@ class TestBallTree:
         tree = BallTree(data, weight)
 
         p = data[0]
-        w = float(weight[0])
+        w = weight[0]
         count = brute_force((data, weight), (p, w), rmax) - brute_force(
             (data, weight), (p, w), rmin
         )
@@ -283,7 +283,7 @@ class TestBallTree:
 
         count = 0.0
         for p, w in zip(data, weight):
-            count += brute_force((data, weight), (p, float(w)), rmax) - brute_force(
+            count += brute_force((data, weight), (p, w), rmax) - brute_force(
                 (data, weight), (p, w), rmin
             )
         assert_almost_equal(tree.dualcount_range(tree, rmin, rmax), count)
