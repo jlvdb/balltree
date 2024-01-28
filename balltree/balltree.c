@@ -189,7 +189,6 @@ static PyArrayObject *weight_ensure_1dim_double_exists(PyObject *weight_obj, npy
             if (temp_tuple == NULL) {
                 return NULL;
             }
-            Py_DECREF(weight_obj);
             weight_obj = temp_tuple;  // temporary tuple, must decref after use
         }
         weight_arr = (PyArrayObject *)PyArray_FromAny(
