@@ -40,8 +40,15 @@ source = "https://github.com/jlvdb/balltree.git"
 test = [
     "pytest",
 ]
+doc = [
+    "sphinx",
+    "sphinx-design",
+    "sphinx-copybutton",
+    "pydata-sphinx-theme",
+]
 dev = [
     "balltree[test]",
+    "balltree[doc]",
     "isort",
     "black",
     "flake8",

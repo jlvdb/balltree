@@ -1,0 +1,10 @@
+numpy
+pytest
+black
+isort
+flake8
+pre-commit
+sphinx
+sphinx-design
+sphinx-copybutton
+pydata-sphinx-theme
