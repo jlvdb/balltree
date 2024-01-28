@@ -1,5 +1,7 @@
 # balltree
 
+![CI tests](https://github.com/jlvdb/balltree/actions/workflows/python-extension-ci.yml/badge.svg)
+
 Fast balltree implementation for 3-dim (weighted) data with an Euclidean
 distance norm. The base implementation is in `C` and there is a wrapper for
 `Python`.
