@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 from ._balltree import BallTree, default_leafsize
+
+
+def sgn(val: ArrayLike) -> ArrayLike:
+    return np.where(val == 0, 1.0, np.sign(val))
 
 
 def radec_to_xy(radec: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -34,8 +38,28 @@ def radec_to_xyz(radec: NDArray[np.float64]) -> NDArray[np.float64]:
     return xyz
 
 
+def xyz_to_radec(xyz: NDArray[np.float64]) -> NDArray[np.float64]:
+    xyz = np.atleast_2d(xyz)
+    x = xyz[:, 0]
+    y = xyz[:, 1]
+    z = xyz[:, 2]
+    r_d2 = np.sqrt(x * x + y * y)
+    r_d3 = np.sqrt(x * x + y * y + z * z)
+
+    radec = np.empty((len(x), 2))
+    x_normed = np.ones_like(x)  # fallback for zero-division, arccos(1)=0.0
+    np.divide(x, r_d2, where=r_d2 > 0.0, out=x_normed)
+    radec[:, 0] = np.arccos(x_normed) * sgn(y) % (2.0 * np.pi)
+    radec[:, 1] = np.arcsin(x / r_d3)
+    return radec
+
+
 def angle_to_radius(angle: float) -> float:
     return 2.0 * np.sin(angle / 2.0)
+
+
+def radius_to_angle(radius: float) -> float:
+    return 2.0 * np.arcsin(radius / 2.0)
 
 
 class AngularTree:
@@ -52,7 +76,15 @@ class AngularTree:
 
     @property
     def data(self) -> NDArray[np.float64]:
-        return self._tree.data
+        data = self._tree.data
+        radec = xy_to_radec(np.transpose([data["x"], data["y"], data["z"]]))
+
+        dtype = [("ra", "f8"), ("dec", "f8"), ("weight", "f8")]
+        array = np.empty(len(data), dtype=dtype)
+        array["ra"] = radec[:, 0]
+        array["dec"] = radec[:, 1]
+        array["weight"] = data["weight"]
+        return array
 
     @property
     def num_data(self) -> int:
@@ -68,11 +100,11 @@ class AngularTree:
 
     @property
     def center(self) -> tuple(float, float, float):
-        return self._tree.center
+        return tuple(xy_to_radec(self._tree.center)[0])
 
     @property
     def radius(self) -> float:
-        return self._tree.radius
+        return radius_to_angle(self._tree.radius)
 
     @classmethod
     def from_random(
