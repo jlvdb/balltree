@@ -100,6 +100,20 @@ class TestAngularTree:
     def test_count_nodes(self, mock_data):
         assert AngularTree(mock_data, leafsize=4).count_nodes() == 3
 
+    def test_brute_radius(self, mock_tree):
+        point = (0.0, 0.0, 0.0)
+        eps = 1e-9
+        radius = np.pi / 2.0
+        assert mock_tree.brute_radius(point, radius - eps) == 1
+        assert mock_tree.brute_radius(point, radius + eps) == 5
+        assert mock_tree.brute_radius(point, 2.0 * radius + eps) == 6
+
+    def test_brute_range(self, mock_tree):
+        point = (0.0, 0.0, 0.0)
+        eps = 1e-9
+        radius = np.pi / 2.0
+        assert mock_tree.brute_range(point, radius - eps, 2.0 * radius + eps) == 5
+
     def test_count_radius(self, mock_tree):
         point = (0.0, 0.0, 0.0)
         eps = 1e-9
@@ -108,9 +122,11 @@ class TestAngularTree:
         assert mock_tree.count_radius(point, radius + eps) == 5
         assert mock_tree.count_radius(point, 2.0 * radius + eps) == 6
 
-    @pytest.mark.skip
-    def test_count_range(self):
-        pass
+    def test_count_range(self, mock_tree):
+        point = (0.0, 0.0, 0.0)
+        eps = 1e-9
+        radius = np.pi / 2.0
+        assert mock_tree.count_range(point, radius - eps, 2.0 * radius + eps) == 5
 
     def test_dualcount_radius(self, mock_tree):
         eps = 1e-9
@@ -120,6 +136,11 @@ class TestAngularTree:
         assert mock_tree.dualcount_radius(mock_tree, radius + eps) == 5 * N
         assert mock_tree.dualcount_radius(mock_tree, 2.0 * radius + eps) == 6 * N
 
-    @pytest.mark.skip
-    def test_dualcount_range(self):
-        pass
+    def test_dualcount_range(self, mock_tree):
+        eps = 1e-9
+        radius = np.pi / 2.0
+        N = mock_tree.num_data
+        assert (
+            mock_tree.dualcount_range(mock_tree, radius - eps, 2.0 * radius + eps)
+            == 5 * N
+        )

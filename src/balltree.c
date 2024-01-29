@@ -69,6 +69,33 @@ long balltree_count_nodes(const BallTree *tree) {
     return bnode_count_nodes(tree->root);
 }
 
+double balltree_brute_radius(
+    const BallTree *tree,
+    const Point *point,
+    double radius
+) {
+    // avoid using *ptslc_from_buffer as the struct allocation could fail
+    PointSlice slice = {
+        .start = tree->data->points,
+        .end = tree->data->points + tree->data->size,
+    };
+    return point->weight * ptslc_sumw_in_radius_sq(&slice, point, radius * radius);
+}
+
+double balltree_brute_range(
+    const BallTree *tree,
+    const Point *point,
+    double rmin,
+    double rmax
+) {
+    // avoid using *ptslc_from_buffer as the struct allocation could fail
+    PointSlice slice = {
+        .start = tree->data->points,
+        .end = tree->data->points + tree->data->size,
+    };
+    return point->weight * ptslc_sumw_in_range_sq(&slice, point, rmin * rmin, rmax * rmax);
+}
+
 double balltree_count_radius(
     const BallTree *tree,
     const Point *point,

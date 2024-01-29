@@ -138,3 +138,59 @@ PointSlice *ptslc_from_buffer(const PointBuffer *buffer) {
 long ptslc_get_size(const PointSlice *slice) {
     return slice->end - slice->start;
 }
+
+double ptslc_sumw_in_radius_sq(
+    const PointSlice *slice,
+    const Point *ref_point,
+    double rad_sq
+) {
+    double sumw = 0.0;
+    for (const Point *point = slice->start; point < slice->end; ++point) {
+        double dist_sq = EUCLIDEAN_DIST_SQ(ref_point, point);
+        // add point weight if condition is met otherwise zero
+        int dist_mask = dist_sq <= rad_sq;
+        sumw += point->weight * (double)dist_mask;
+    }
+    return sumw;
+}
+
+double ptslc_sumw_in_range_sq(
+    const PointSlice *slice,
+    const Point *ref_point,
+    double rmin_sq,
+    double rmax_sq
+) {
+    double sumw = 0.0;
+    for (const Point *point = slice->start; point < slice->end; ++point) {
+        double dist_sq = EUCLIDEAN_DIST_SQ(ref_point, point);
+        // add point weight if condition is met otherwise zero
+        int dist_mask = rmin_sq < dist_sq && dist_sq <= rmax_sq;
+        sumw += point->weight * (double)dist_mask;
+    }
+    return sumw;
+}
+
+double ptslc_dualsumw_in_radius_sq(
+    const PointSlice *slice1,
+    const PointSlice *slice2,
+    double rad_sq
+) {
+    double sumw = 0.0;
+    for (const Point *point = slice1->start; point < slice1->end; ++point) {
+        sumw += point->weight * ptslc_sumw_in_radius_sq(slice2, point, rad_sq);
+    }
+    return sumw;
+}
+
+double ptslc_dualsumw_in_range_sq(
+    const PointSlice *slice1,
+    const PointSlice *slice2,
+    double rmin_sq,
+    double rmax_sq
+) {
+    double sumw = 0.0;
+    for (const Point *point = slice1->start; point < slice1->end; ++point) {
+        sumw += point->weight * ptslc_sumw_in_range_sq(slice2, point, rmin_sq, rmax_sq);
+    }
+    return sumw;
+}

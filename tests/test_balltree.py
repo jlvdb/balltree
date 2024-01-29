@@ -265,6 +265,28 @@ class TestBallTree:
         npt.assert_almost_equal(tree.count_range(p, rmin, rmax, weight=w), count)
 
     @pytest.mark.parametrize("radius", radius_testvalues)
+    def test_brute_radius_multi(self, radius, rand_data_weight):
+        data, weight = rand_data_weight
+        tree = BallTree(data, weight)
+
+        count = 0.0
+        for p, w in zip(data, weight):
+            count += brute_force((data, weight), (p, w), radius)
+        npt.assert_almost_equal(tree.brute_radius(data, radius, weight), count)
+
+    @pytest.mark.parametrize("rmin,rmax", rminmax_testvalues)
+    def test_brute_range_multi(self, rmin, rmax, rand_data_weight):
+        data, weight = rand_data_weight
+        tree = BallTree(data, weight)
+
+        count = 0.0
+        for p, w in zip(data, weight):
+            count += brute_force((data, weight), (p, w), rmax) - brute_force(
+                (data, weight), (p, w), rmin
+            )
+        npt.assert_almost_equal(tree.brute_range(data, rmin, rmax, weight), count)
+
+    @pytest.mark.parametrize("radius", radius_testvalues)
     def test_dualcount_radius(self, radius, rand_data_weight):
         data, weight = rand_data_weight
         tree = BallTree(data, weight)

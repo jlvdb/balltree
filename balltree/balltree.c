@@ -55,6 +55,8 @@ static PyObject *PyBallTree_str(PyObject *self);
 static PyObject *PyBallTree_to_file(PyBallTree *self, PyObject *args);
 static PyObject *PyBallTree_count_nodes(PyBallTree *self);
 static PyObject *PyBallTree_get_node_data(PyBallTree *self);
+static PyObject *PyBallTree_brute_radius(PyBallTree *self, PyObject *args, PyObject *kwargs);
+static PyObject *PyBallTree_brute_range(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_count_radius(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_count_range(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_dualcount_radius(PyBallTree *self, PyObject *args);
@@ -667,6 +669,128 @@ static PyObject *PyBallTree_get_node_data(PyBallTree *self) {
     return array;
 }
 
+static PyObject *PyBallTree_brute_radius(
+    PyBallTree *self,
+    PyObject *args,
+    PyObject *kwargs
+) {
+    static char *kwlist[] = {"xyz", "radius", "weight", NULL};
+    PyObject *xyz_obj, *weight_obj = Py_None;
+    double radius;
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, "Od|O", kwlist,
+            &xyz_obj, &radius, &weight_obj)
+    ) {
+        return NULL;
+    }
+
+    PyObject *pycount = NULL;  // return value
+    PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
+    NpyIterHelper *xyz_iter = NULL;
+
+    // ensure that inputs are numpy arrays of correct type and shape
+    xyz_arr = xyz_ensure_2dim_double(xyz_obj);
+    if (xyz_arr == NULL) {
+        return NULL;
+    }
+    npy_intp length = PyArray_DIM(xyz_arr, 0);
+    if (length == 0) {
+        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
+        goto error;
+    }
+    weight_arr = weight_matched_1dim_double(weight_obj, length);
+    if (weight_arr == NULL) {
+        goto error;
+    }
+
+    // get an iterator for input data
+    xyz_iter = npyiterhelper_new(xyz_arr);
+    if (xyz_iter == NULL) {
+        goto error;
+    }
+    double *weight_buffer = PyArray_DATA(weight_arr);
+
+    // count neighbours for all inputs
+    double count = 0.0;
+    long idx = 0;
+    Point point;
+    while (iter_get_next_xyz(xyz_iter, &point.x, &point.y, &point.z)) {
+        point.weight = weight_buffer[idx];
+        count += balltree_brute_radius(self->balltree, &point, radius);
+        ++idx;
+    }
+    pycount = PyFloat_FromDouble(count);
+
+error:
+    if (xyz_iter != NULL) {
+        npyiterhelper_free(xyz_iter);
+    }
+    Py_XDECREF(weight_arr);
+    Py_XDECREF(xyz_arr);
+    return pycount;
+}
+
+static PyObject *PyBallTree_brute_range(
+    PyBallTree *self,
+    PyObject *args,
+    PyObject *kwargs
+) {
+    static char *kwlist[] = {"xyz", "rmin", "rmax", "weight", NULL};
+    PyObject *xyz_obj, *weight_obj = Py_None;
+    double rmin, rmax;
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, "Odd|O", kwlist,
+            &xyz_obj, &rmin, &rmax, &weight_obj)
+    ) {
+        return NULL;
+    }
+
+    PyObject *pycount = NULL;  // return value
+    PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
+    NpyIterHelper *xyz_iter = NULL;
+
+    // ensure that inputs are numpy arrays of correct type and shape
+    xyz_arr = xyz_ensure_2dim_double(xyz_obj);
+    if (xyz_arr == NULL) {
+        return NULL;
+    }
+    npy_intp length = PyArray_DIM(xyz_arr, 0);
+    if (length == 0) {
+        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
+        goto error;
+    }
+    weight_arr = weight_matched_1dim_double(weight_obj, length);
+    if (weight_arr == NULL) {
+        goto error;
+    }
+
+    // get an iterator for input data
+    xyz_iter = npyiterhelper_new(xyz_arr);
+    if (xyz_iter == NULL) {
+        goto error;
+    }
+    double *weight_buffer = PyArray_DATA(weight_arr);
+
+    // count neighbours for all inputs
+    double count = 0.0;
+    long idx = 0;
+    Point point;
+    while (iter_get_next_xyz(xyz_iter, &point.x, &point.y, &point.z)) {
+        point.weight = weight_buffer[idx];
+        count += balltree_brute_range(self->balltree, &point, rmin, rmax);
+        ++idx;
+    }
+    pycount = PyFloat_FromDouble(count);
+
+error:
+    if (xyz_iter != NULL) {
+        npyiterhelper_free(xyz_iter);
+    }
+    Py_XDECREF(weight_arr);
+    Py_XDECREF(xyz_arr);
+    return pycount;
+}
+
 static PyObject *PyBallTree_count_radius(
     PyBallTree *self,
     PyObject *args,
@@ -888,6 +1012,18 @@ static PyMethodDef PyBallTree_methods[] = {
         .ml_meth = (PyCFunction)PyBallTree_get_node_data,
         .ml_flags = METH_NOARGS,
         .ml_doc = "Get the primary node information"
+    },
+    {
+        .ml_name = "brute_radius",
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_brute_radius,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Count pairs within a radius"
+    },
+    {
+        .ml_name = "brute_range",
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_brute_range,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Count pairs within a range"
     },
     {
         .ml_name = "count_radius",

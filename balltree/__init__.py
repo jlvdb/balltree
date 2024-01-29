@@ -1,4 +1,4 @@
-__version__ = "0.2"
+__version__ = "0.3"
 
 from .angulartree import AngularTree
 from .balltree import BallTree, default_leafsize

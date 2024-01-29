@@ -45,5 +45,9 @@ PointBuffer *ptbuf_gen_random(double, double, long);
 
 PointSlice *ptslc_from_buffer(const PointBuffer *);
 long ptslc_get_size(const PointSlice *);
+double ptslc_sumw_in_radius_sq(const PointSlice *, const Point *, double);
+double ptslc_sumw_in_range_sq(const PointSlice *, const Point *, double, double);
+double ptslc_dualsumw_in_radius_sq(const PointSlice *, const PointSlice *, double);
+double ptslc_dualsumw_in_range_sq(const PointSlice *, const PointSlice *, double, double);
 
 #endif /* POINT_H */

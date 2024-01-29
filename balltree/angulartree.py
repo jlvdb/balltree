@@ -95,6 +95,28 @@ class AngularTree:
     def get_node_data(self) -> NDArray:
         return self._tree.get_node_data()
 
+    def brute_radius(
+        self,
+        radec: NDArray,
+        angle: float,
+        weight: NDArray | None = None,
+    ) -> float:
+        xyz = coord.angular_to_euclidean(radec)
+        radius = coord.angle_to_chorddist(angle)
+        return self._tree.brute_radius(xyz, radius, weight)
+
+    def brute_range(
+        self,
+        radec: NDArray,
+        ang_min: float,
+        ang_max: float,
+        weight: NDArray | None = None,
+    ) -> float:
+        xyz = coord.angular_to_euclidean(radec)
+        rmin = coord.angle_to_chorddist(ang_min)
+        rmax = coord.angle_to_chorddist(ang_max)
+        return self._tree.brute_range(xyz, rmin, rmax, weight)
+
     def count_radius(
         self,
         radec: NDArray,

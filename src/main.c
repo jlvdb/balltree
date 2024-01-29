@@ -41,7 +41,21 @@ int main(int argc, char** argv) {
     printf("radius=%.3lf\n", query_radius);
 
     // query point at fixed radius, show the elapsed time
-    int imax = 1;
+    int imax;
+    printf("brute force:\n");
+    imax = 1;
+    while (imax <= 100) {
+        count = 0;
+        time = clock();
+        for (int i = 0; i < imax ; ++i)
+            count += balltree_brute_radius(tree, buffer->points + i, query_radius);
+        elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
+        printf("%3dx found %11.0lf pairs in %7.3lf ms\n", imax, count, elapsed);
+        imax *= 10;
+    }
+
+    printf("tree pruning:\n");
+    imax = 1;
     while (imax <= 100) {
         count = 0;
         time = clock();
@@ -83,7 +97,7 @@ int main(int argc, char** argv) {
     time = clock();
     BallTree *tree2 = balltree_from_file(fpath);
     if (tree2 == NULL) {
-        return 1;  
+        return 1;
     }
     elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
     printf("restored in %7.3lf ms\n", elapsed);
