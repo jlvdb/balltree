@@ -78,3 +78,31 @@ html_sidebars = {
 html_context = {
     "default_mode": "auto",
 }
+
+# -- Build custom files ------------------------------------------------------
+
+# generate the index page
+index_text = """
+Welcome to balltree's documentation!
+====================================
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   examples
+   api
+
+%README%
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
+"""
+with open("../../README.rst") as f:
+    readme_text = "".join(f.readlines()[2:])  # drop header line
+with open("index.rst", "w") as f:
+    f.write(index_text.replace("%README%", readme_text))
