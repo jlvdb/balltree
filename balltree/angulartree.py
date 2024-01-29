@@ -20,13 +20,15 @@ class AngularTree:
         weight: NDArray | None = None,
         leafsize: int = default_leafsize,
     ) -> None:
-        xyz = coord.radec_to_xyz(radec)
+        xyz = coord.angular_to_euclidean(radec)
         self._tree = BallTree(xyz, weight, leafsize=leafsize)
 
     @property
     def data(self) -> NDArray[np.float64]:
         data = self._tree.data
-        radec = coord.xy_to_radec(np.transpose([data["x"], data["y"], data["z"]]))
+        radec = coord.euclidean_to_angular(
+            np.transpose([data["x"], data["y"], data["z"]])
+        )
 
         dtype = [("ra", "f8"), ("dec", "f8"), ("weight", "f8")]
         array = np.empty(len(data), dtype=dtype)
@@ -49,11 +51,18 @@ class AngularTree:
 
     @property
     def center(self) -> tuple(float, float, float):
-        return tuple(coord.xy_to_radec(self._tree.center)[0])
+        return tuple(coord.euclidean_to_angular(self._tree.center)[0])
 
     @property
     def radius(self) -> float:
-        return coord.radius_to_angle(self._tree.radius)
+        center_xyz = coord.angular_to_euclidean(self.center)[0]
+        data_xyz = self._tree.data
+        # compute the maximum distance from the center project one the sphere
+        dx = data_xyz["x"] - center_xyz[0]
+        dy = data_xyz["y"] - center_xyz[1]
+        dz = data_xyz["z"] - center_xyz[2]
+        dist = np.sqrt(dx * dx + dy * dy + dz * dz)
+        return coord.chorddist_to_angle(dist.max())
 
     @classmethod
     def from_random(
@@ -64,11 +73,11 @@ class AngularTree:
         dec_max: float,
         size: int,
     ) -> AngularTree:
-        x_min, y_min = coord.radec_to_xy(ra_min, dec_min)
-        x_max, y_max = coord.radec_to_xy(ra_max, dec_max)
+        ((x_min, y_min),) = coord.angular_to_cylinder([ra_min, dec_min])
+        ((x_max, y_max),) = coord.angular_to_cylinder([ra_max, dec_max])
         x = np.random.uniform(x_min, x_max, size)
         y = np.random.uniform(y_min, y_max, size)
-        radec = coord.xy_to_radec(np.transpose([x, y]))
+        radec = coord.cylinder_to_angular(np.transpose([x, y]))
         return cls(radec)
 
     @classmethod
@@ -92,8 +101,8 @@ class AngularTree:
         angle: float,
         weight: NDArray | None = None,
     ) -> float:
-        xyz = coord.radec_to_xyz(radec)
-        radius = coord.angle_to_radius(angle)
+        xyz = coord.angular_to_euclidean(radec)
+        radius = coord.angle_to_chorddist(angle)
         return self._tree.count_radius(xyz, radius, weight)
 
     def count_range(
@@ -103,9 +112,9 @@ class AngularTree:
         ang_max: float,
         weight: NDArray | None = None,
     ) -> float:
-        xyz = coord.radec_to_xyz(radec)
-        rmin = coord.angle_to_radius(ang_min)
-        rmax = coord.angle_to_radius(ang_max)
+        xyz = coord.angular_to_euclidean(radec)
+        rmin = coord.angle_to_chorddist(ang_min)
+        rmax = coord.angle_to_chorddist(ang_max)
         return self._tree.count_range(xyz, rmin, rmax, weight)
 
     def dualcount_radius(
@@ -113,8 +122,10 @@ class AngularTree:
         other: AngularTree,
         angle: float,
     ) -> float:
-        radius = coord.angle_to_radius(angle)
-        return self._tree.dualcount_radius(other, radius)
+        if not isinstance(other, self.__class__):
+            raise TypeError("'other' must be of type 'AngularTree'")
+        radius = coord.angle_to_chorddist(angle)
+        return self._tree.dualcount_radius(other._tree, radius)
 
     def dualcount_range(
         self,
@@ -122,6 +133,8 @@ class AngularTree:
         ang_min: float,
         ang_max: float,
     ) -> float:
-        rmin = coord.angle_to_radius(ang_min)
-        rmax = coord.angle_to_radius(ang_max)
-        return self._tree.dualcount_range(other, rmin, rmax)
+        if not isinstance(other, self.__class__):
+            raise TypeError("'other' must be of type 'AngularTree'")
+        rmin = coord.angle_to_chorddist(ang_min)
+        rmax = coord.angle_to_chorddist(ang_max)
+        return self._tree.dualcount_range(other._tree, rmin, rmax)
