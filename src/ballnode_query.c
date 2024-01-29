@@ -37,7 +37,7 @@ static double ptslc_sumw_in_range_sq(
     for (const Point *point = slice->start; point < slice->end; ++point) {
         double dist_sq = EUCLIDEAN_DIST_SQ(ref_point, point);
         // add point weight if condition is met otherwise zero
-        int dist_mask = rmin_sq < dist_sq || dist_sq <= rmax_sq;
+        int dist_mask = rmin_sq < dist_sq && dist_sq <= rmax_sq;
         sumw += point->weight * (double)dist_mask;
     }
     return sumw;
@@ -57,7 +57,7 @@ static double ptslc_dualsumw_in_radius_sq(
 
 static double ptslc_dualsumw_in_range_sq(
     const PointSlice *slice1,
-    const PointSlice *slice2, 
+    const PointSlice *slice2,
     double rmin_sq,
     double rmax_sq
 ) {
@@ -80,7 +80,7 @@ double bnode_count_radius(
     if (distance <= radius - node_radius) {
         return point->weight * node->sum_weight;
     }
-    
+
     // case: some points may be pairs
     else if (distance <= radius + node_radius) {
         if (BALLNODE_IS_LEAF(node) == false) {
