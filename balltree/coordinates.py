@@ -3,9 +3,19 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
+__all__ = [
+    "sgn",
+    "angular_to_cylinder",
+    "cylinder_to_angular",
+    "angular_to_euclidean",
+    "euclidean_to_angular",
+    "angle_to_chorddist",
+    "chorddist_to_angle",
+]
+
 
 def sgn(val: ArrayLike) -> NDArray[np.float64]:
-    return np.where(val == 0, 1.0, np.sign(val, dtype=np.float64))
+    return 2.0 * (val >= 0.0) - 1.0  # 1.0 if (val >= 0.0) else -1.0
 
 
 def angular_to_cylinder(radec: NDArray) -> NDArray[np.float64]:
@@ -48,7 +58,7 @@ def euclidean_to_angular(xyz: NDArray) -> NDArray[np.float64]:
     x_normed = np.ones_like(x)  # fallback for zero-division, arccos(1)=0.0
     np.divide(x, r_d2, where=r_d2 > 0.0, out=x_normed)
     radec[:, 0] = np.arccos(x_normed) * sgn(y) % (2.0 * np.pi)
-    radec[:, 1] = np.arcsin(x / r_d3)
+    radec[:, 1] = np.arcsin(z / r_d3)
     return radec
 
 

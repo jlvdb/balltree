@@ -2,7 +2,7 @@ import numpy as np
 from setuptools import Extension, setup
 
 balltree = Extension(
-    name="balltree._balltree",
+    name="balltree.balltree",
     sources=[
         "balltree/balltree.c",
         "src/point.c",

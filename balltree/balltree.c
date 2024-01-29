@@ -1,3 +1,4 @@
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <numpy/arrayobject.h>
 
@@ -934,12 +935,12 @@ static PyTypeObject PyBallTreeType = {
 
 static struct PyModuleDef pyballtree = {
     PyModuleDef_HEAD_INIT,
-    .m_name = "balltree._balltree",
+    .m_name = "balltree.balltree",
     .m_doc = "Fast balltree implementation",
     .m_size = -1,
 };
 
-PyMODINIT_FUNC PyInit__balltree(void) {
+PyMODINIT_FUNC PyInit_balltree(void) {
     if (PyType_Ready(&PyBallTreeType) < 0) {
         return NULL;
     }

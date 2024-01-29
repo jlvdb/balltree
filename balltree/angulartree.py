@@ -4,7 +4,11 @@ import numpy as np
 from numpy.typing import NDArray
 
 from balltree import coordinates as coord
-from balltree._balltree import BallTree, default_leafsize
+from balltree.balltree import BallTree, default_leafsize
+
+__all__ = [
+    "AngularTree",
+]
 
 
 class AngularTree:

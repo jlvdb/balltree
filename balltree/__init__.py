@@ -1,7 +1,7 @@
-__version__ = "0.1"
+__version__ = "0.2"
 
-from ._balltree import BallTree, default_leafsize
 from .angulartree import AngularTree
+from .balltree import BallTree, default_leafsize
 
 __all__ = [
     "AngularTree",
