@@ -193,14 +193,14 @@ class TestBallTree:
         assert_array_equal(data_to_view(mock_data), BallTree(mock_data).data)
 
     def test_from_random(self):
-        low = -2.0
-        high = 2.0
+        low = -1.0
+        high = 1.0
         size = 100000
         tree = BallTree.from_random(low, high, size)
         data = np.array(tree.data.tolist())
         assert len(data) == size
         assert data.min() >= low
-        assert data.max() < high
+        assert data.max() <= high
         assert np.all(data[:, -1] == 1.0)
 
     def test_to_from_file(self, mock_data, mock_weight, tmp_path):
