@@ -172,7 +172,7 @@ class TestBallTree:
             BallTree(None)
         with raises(ValueError):
             BallTree(1.0)
-        with raises(ValueError):
+        with raises(TypeError):
             BallTree(["asldfkj"])
 
     def test_sum_weight(self, mock_data, mock_weight):
