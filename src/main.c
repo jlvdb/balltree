@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <time.h>
-#include <locale.h>
 
 #include "point.h"
 #include "balltree.h"
@@ -18,7 +17,6 @@ int main(int argc, char** argv) {
 
     clock_t time;
     double elapsed;
-    setlocale(LC_NUMERIC, "");
 
     // read the input file contents, show the elapsed time
     const char filepath[] = "testing/BOSS.txt";

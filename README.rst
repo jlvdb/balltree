@@ -40,7 +40,6 @@ Using the `C` library
 ^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: c
-    :linenos:
 
     #include <stdio.h>
     #include <stdlib.h>
@@ -79,7 +78,6 @@ Using the `Python` wrapper
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
-    :linenos:
 
     import numpy as np
     from balltree import BallTree
