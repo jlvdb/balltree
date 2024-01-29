@@ -364,23 +364,27 @@ static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
     }
     // get the numpy API array descriptor
     PyArray_Descr *arr_descr;
-    int result = PyArray_DescrConverter(arr_dtype, &arr_descr);  // PyArray_Descr **
+    int result = PyArray_DescrConverter(arr_dtype, &arr_descr);
     Py_DECREF(arr_dtype);
     if (result != NPY_SUCCEED) {
         return NULL;
     }
 
     // get an array view
-    return PyArray_NewFromDescr(
+    PyObject *view = PyArray_NewFromDescr(
         &PyArray_Type,
         arr_descr,  // reference stolen, no Py_DECREF needed
         ndim,
         shape,
         NULL,
         buffer->points,
-        NPY_ARRAY_CARRAY,
+        NPY_ARRAY_CARRAY_RO,
         NULL
     );
+    if (view == NULL) {
+        Py_DECREF(arr_descr);  // not sure if that is necessary
+    }
+    return view;
 }
 
 static PyObject *statvec_get_numpy_array(StatsVector *vec) {
@@ -543,7 +547,19 @@ static PyObject *PyBallTree_from_file(PyTypeObject *type, PyObject *args) {
 // PyBallTree: property implementations ////////////////////////////////////////
 
 static PyObject *PyBallTree_get_data(PyBallTree *self, void *closure) {
-    return ptbuf_get_numpy_view(self->balltree->data);
+    PyObject *view = ptbuf_get_numpy_view(self->balltree->data);
+    if (view == NULL) {
+        return NULL;
+    }
+    // make sure that BallTree instance with the underlying buffer stays alive
+    // as long as view is in use
+    Py_INCREF(self);  // next line steals one
+    if (PyArray_SetBaseObject((PyArrayObject *)view, (PyObject *)self)) {
+        Py_DECREF(self);
+        Py_DECREF(view);
+        return NULL;
+    }
+    return view;
 }
 
 static PyObject *PyBallTree_get_num_data(PyBallTree *self, void *closure) {

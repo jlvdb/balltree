@@ -187,9 +187,8 @@ class TestBallTree:
         tree = BallTree(mock_data)
         assert tree.radius == mock_radius
 
-    @mark.xfail
     def test_chaining(self, mock_data):
-        # this works if the order of the function arguments is reversed
+        # checks if the lifetime of the underlying buffer is correclty managed
         assert_array_equal(data_to_view(mock_data), BallTree(mock_data).data)
 
     def test_from_random(self):
