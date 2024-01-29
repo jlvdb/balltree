@@ -30,7 +30,7 @@ classifiers = [
 ]
 requires-python = ">=3.7"
 dependencies = [
-    "numpy",
+    "numpy>=1.21",
 ]
 
 [project.urls]
