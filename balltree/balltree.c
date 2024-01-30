@@ -21,6 +21,14 @@ typedef struct {
 } NpyIterHelper;
 
 typedef struct {
+    long size;
+    PyArrayObject *xyz_arr;
+    NpyIterHelper *xyz_iter;
+    PyArrayObject *weight_arr;
+    double *weight_buffer;
+} InputIterData;
+
+typedef struct {
     PyObject_HEAD
     BallTree *balltree;
 } PyBallTree;
@@ -36,9 +44,13 @@ PyArrayObject *numpy_array_add_dim(PyArrayObject* array);
 static PyArrayObject *ensure_numpy_array_1dim_double(PyObject *weight_obj);
 static PyArrayObject *xyz_ensure_2dim_double(PyObject *xyz_obj);
 static PyArrayObject *weight_matched_1dim_double(PyObject *weight_obj, npy_intp length);
+static InputIterData *inputiterdata_new(PyObject *xyz_obj, PyObject *weight_obj);
+void inputiterdata_free(InputIterData *);
 static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj);
 static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer);
 static PyObject *statvec_get_numpy_array(StatsVector *vec);
+static DistHistogram *disthistogram_from_PyObject(PyObject *edges_obj);
+static PyObject *PyObject_from_disthistogram(DistHistogram *hist);
 static PyObject *PyBallTree_accumulate_radius(PyBallTree *self, count_radius_func accumulator, PyObject *xyz_obj, double radius, PyObject *weight_obj);
 static PyObject *PyBallTree_accumulate_range(PyBallTree *self, count_range_func accumulator, PyObject *xyz_obj, PyObject *edges_obj, PyObject *weight_obj);
 
@@ -307,51 +319,68 @@ static PyArrayObject *weight_matched_1dim_double(PyObject *weight_obj, npy_intp 
     return weight_arr;
 }
 
-static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj) {
-    PointBuffer *buffer = NULL;  // return value
-    PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
-    NpyIterHelper *xyz_iter = NULL;
-
-    // ensure that inputs are numpy arrays of correct type and shape
-    xyz_arr = xyz_ensure_2dim_double(xyz_obj);
-    if (xyz_arr == NULL) {
+static InputIterData *inputiterdata_new(PyObject *xyz_obj, PyObject *weight_obj) {
+    InputIterData *data = calloc(1, sizeof(InputIterData));
+    if (data == NULL) {
         return NULL;
     }
-    npy_intp length = PyArray_DIM(xyz_arr, 0);
-    if (length == 0) {
-        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
-        goto error;
+
+    // ensure that inputs are numpy arrays of correct type and shape
+    data->xyz_arr = xyz_ensure_2dim_double(xyz_obj);
+    if (data->xyz_arr == NULL) {
+        inputiterdata_free(data);
+        return NULL;
     }
-    weight_arr = weight_matched_1dim_double(weight_obj, length);
-    if (weight_arr == NULL) {
-        goto error;
+    data->size = PyArray_DIM(data->xyz_arr, 0);
+    if (data->size == 0) {
+        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
+        inputiterdata_free(data);
+        return NULL;
+    }
+    data->weight_arr = weight_matched_1dim_double(weight_obj, data->size);
+    if (data->weight_arr == NULL) {
+        inputiterdata_free(data);
+        return NULL;
     }
 
     // get an iterator for input data
-    xyz_iter = npyiterhelper_new(xyz_arr);
-    if (xyz_iter == NULL) {
-        goto error;
+    data->xyz_iter = npyiterhelper_new(data->xyz_arr);
+    if (data->xyz_iter == NULL) {
+        inputiterdata_free(data);
+        return NULL;
     }
-    double *weight_buffer = PyArray_DATA(weight_arr);
+    data->weight_buffer = PyArray_DATA(data->weight_arr);
 
+    return data;
+}
+
+void inputiterdata_free(InputIterData *data) {
+    Py_XDECREF(data->xyz_arr);
+    if (data->xyz_iter != NULL) {
+        npyiterhelper_free(data->xyz_iter);
+    }
+    Py_XDECREF(data->weight_arr);
+    free(data);
+}
+
+static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj) {
+    InputIterData *data = inputiterdata_new(xyz_obj, weight_obj);
+    if (data == NULL) {
+        return NULL;
+    }
     // build and fill point buffer
-    buffer = ptbuf_new(length);
+    PointBuffer *buffer = ptbuf_new(data->size);
     if (buffer == NULL) {
-        goto error;
+        inputiterdata_free(data);
+        return NULL;
     }
     long idx = 0;
     double x, y, z;
-    while (iter_get_next_xyz(xyz_iter, &x, &y, &z)) {
-        buffer->points[idx] = (Point){x, y, z, weight_buffer[idx]};
+    while (iter_get_next_xyz(data->xyz_iter, &x, &y, &z)) {
+        buffer->points[idx] = (Point){x, y, z, data->weight_buffer[idx]};
         ++idx;
     }
-
-error:
-    if (xyz_iter != NULL) {
-        npyiterhelper_free(xyz_iter);
-    }
-    Py_XDECREF(weight_arr);
-    Py_XDECREF(xyz_arr);
+    inputiterdata_free(data);
     return buffer;
 }
 
@@ -393,6 +422,31 @@ static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
         Py_DECREF(arr_descr);  // not sure if that is necessary
     }
     return view;
+}
+
+static DistHistogram *disthistogram_from_PyObject(PyObject *edges_obj) {
+    PyArrayObject *edges_arr = ensure_numpy_array_1dim_double(edges_obj);
+    if (edges_arr == NULL) {
+        return NULL;
+    }
+    long num_edges = (long)PyArray_DIM(edges_arr, 0);
+    double *edges_buffer = PyArray_DATA(edges_arr);
+    DistHistogram *hist = hist_new(num_edges, edges_buffer);
+    Py_DECREF(edges_arr);
+    return hist;
+}
+
+static PyObject *PyObject_from_disthistogram(DistHistogram *hist) {
+    npy_intp dims = {hist->size};
+    PyObject *pycount = PyArray_SimpleNew(1, &dims, NPY_DOUBLE);
+    if (pycount == NULL) {
+        return NULL;
+    }
+    double *count_buffer = PyArray_DATA(pycount);
+    for (long i = 0; i < hist->size; ++i) {
+        count_buffer[i] = hist->sum_weight[i];
+    }
+    return pycount;
 }
 
 static PyObject *statvec_get_numpy_array(StatsVector *vec) {
@@ -440,52 +494,21 @@ static PyObject *PyBallTree_accumulate_radius(
     double radius,
     PyObject *weight_obj
 ) {
-    PyObject *pycount = NULL;  // return value
-    PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
-    NpyIterHelper *xyz_iter = NULL;
-
-    // ensure that inputs are numpy arrays of correct type and shape
-    xyz_arr = xyz_ensure_2dim_double(xyz_obj);
-    if (xyz_arr == NULL) {
+    InputIterData *data = inputiterdata_new(xyz_obj, weight_obj);
+    if (data == NULL) {
         return NULL;
     }
-    npy_intp length = PyArray_DIM(xyz_arr, 0);
-    if (length == 0) {
-        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
-        goto error;
-    }
-    weight_arr = weight_matched_1dim_double(weight_obj, length);
-    if (weight_arr == NULL) {
-        goto error;
-    }
-
-    // get an iterator for input data
-    xyz_iter = npyiterhelper_new(xyz_arr);
-    if (xyz_iter == NULL) {
-        goto error;
-    }
-    double *weight_buffer = PyArray_DATA(weight_arr);
-
     // count neighbours for all inputs
     double count = 0.0;
     long idx = 0;
     Point point;
-    while (iter_get_next_xyz(xyz_iter, &point.x, &point.y, &point.z)) {
-        point.weight = weight_buffer[idx];
+    while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
+        point.weight = data->weight_buffer[idx];
         count += accumulator(self->balltree, &point, radius);
         ++idx;
     }
-
-    // pack counts and return them
-    pycount = PyFloat_FromDouble(count);
-
-error:
-    if (xyz_iter != NULL) {
-        npyiterhelper_free(xyz_iter);
-    }
-    Py_XDECREF(weight_arr);
-    Py_XDECREF(xyz_arr);
-    return pycount;
+    inputiterdata_free(data);
+    return PyFloat_FromDouble(count);
 }
 
 static PyObject *PyBallTree_accumulate_range(
@@ -495,76 +518,27 @@ static PyObject *PyBallTree_accumulate_range(
     PyObject *edges_obj,
     PyObject *weight_obj
 ) {
-    PyObject *pycount = NULL;  // return value
-    PyArrayObject *xyz_arr = NULL, *edges_arr = NULL, *weight_arr = NULL;
-    DistHistogram *hist = NULL;
-    NpyIterHelper *xyz_iter = NULL;
-
-    // ensure that inputs are numpy arrays of correct type and shape
-    xyz_arr = xyz_ensure_2dim_double(xyz_obj);
-    if (xyz_arr == NULL) {
+    InputIterData *data = inputiterdata_new(xyz_obj, weight_obj);
+    if (data == NULL) {
         return NULL;
     }
-    npy_intp length = PyArray_DIM(xyz_arr, 0);
-    if (length == 0) {
-        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
-        goto error;
-    }
-    weight_arr = weight_matched_1dim_double(weight_obj, length);
-    if (weight_arr == NULL) {
-        goto error;
-    }
-
-    // get an iterator for input data
-    xyz_iter = npyiterhelper_new(xyz_arr);
-    if (xyz_iter == NULL) {
-        goto error;
-    }
-    double *weight_buffer = PyArray_DATA(weight_arr);
-
-    // setup the accumulating histogram
-    edges_arr = ensure_numpy_array_1dim_double(edges_obj);
-    if (edges_arr == NULL) {
-        goto error;
-    }
-    long num_edges = (long)PyArray_DIM(edges_arr, 0);
-    double *edges_buffer = PyArray_DATA(edges_arr);
-    hist = hist_new(num_edges, edges_buffer);
+    DistHistogram *hist = disthistogram_from_PyObject(edges_obj);
     if (hist == NULL) {
-        goto error;
+        inputiterdata_free(data);
+        return NULL;
     }
-
     // count neighbours for all inputs
     long idx = 0;
     Point point;
-    while (iter_get_next_xyz(xyz_iter, &point.x, &point.y, &point.z)) {
-        point.weight = weight_buffer[idx];
+    while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
+        point.weight = data->weight_buffer[idx];
         balltree_brute_range(self->balltree, &point, hist);
         ++idx;
     }
-
-    // copy counts into new numpy array and return them
-    npy_intp dims = {hist->size};
-    pycount = PyArray_SimpleNew(1, &dims, NPY_DOUBLE);
-    if (pycount == NULL) {
-        goto error;
-    }
-    double *count_buffer = PyArray_DATA(pycount);
-    for (long i = 0; i < hist->size; ++i) {
-        count_buffer[i] = hist->sum_weight[i];
-    }
-
-error:
-    if (xyz_iter != NULL) {
-        npyiterhelper_free(xyz_iter);
-    }
-    if (hist != NULL) {
-        hist_free(hist);
-    }
-    Py_XDECREF(weight_arr);
-    Py_XDECREF(edges_arr);
-    Py_XDECREF(xyz_arr);
-    return pycount;
+    PyObject *pycounts = PyObject_from_disthistogram(hist);
+    inputiterdata_free(data);
+    hist_free(hist);
+    return pycounts;
 }
 
 // PyBallTree: constructors & deallocators /////////////////////////////////////
@@ -919,37 +893,14 @@ static PyObject *PyBallTree_dualcount_range(PyBallTree *self, PyObject *args) {
         return NULL;
     }
 
-    PyObject *pycount = NULL;  // return value
-    PyArrayObject *edges_arr = NULL;
-    DistHistogram *hist = NULL;
-    edges_arr = ensure_numpy_array_1dim_double(edges_obj);
-    if (edges_arr == NULL) {
-        goto error;
-    }
-    long num_edges = (long)PyArray_DIM(edges_arr, 0);
-    double *edges_buffer = PyArray_DATA(edges_arr);
-    hist = hist_new(num_edges, edges_buffer);
+    DistHistogram *hist = disthistogram_from_PyObject(edges_obj);
     if (hist == NULL) {
-        goto error;
+        return NULL;
     }
-
     balltree_dualcount_range(self->balltree, other_tree->balltree, hist);
-    npy_intp dims = {hist->size};
-    pycount = PyArray_SimpleNew(1, &dims, NPY_DOUBLE);
-    if (pycount == NULL) {
-        goto error;
-    }
-    double *count_buffer = PyArray_DATA(pycount);
-    for (long i = 0; i < hist->size; ++i) {
-        count_buffer[i] = hist->sum_weight[i];
-    }
-
-error:
-    if (hist != NULL) {
-        hist_free(hist);
-    }
-    Py_XDECREF(edges_arr);
-    return pycount;
+    PyObject *pycounts = PyObject_from_disthistogram(hist);
+    hist_free(hist);
+    return pycounts;
 }
 
 // PyBallTree definition ///////////////////////////////////////////////////////
@@ -1028,28 +979,28 @@ static PyMethodDef PyBallTree_methods[] = {
         .ml_doc = "Count pairs within a radius"
     },
     {
-        .ml_name = "brute_range",
-        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_brute_range,
-        .ml_flags = METH_VARARGS | METH_KEYWORDS,
-        .ml_doc = "Count pairs within a range"
-    },
-    {
         .ml_name = "count_radius",
         .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_radius,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
         .ml_doc = "Count pairs within a radius"
     },
     {
-        .ml_name = "count_range",
-        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_range,
-        .ml_flags = METH_VARARGS | METH_KEYWORDS,
-        .ml_doc = "Count pairs within a range"
-    },
-    {
         .ml_name = "dualcount_radius",
         .ml_meth = (PyCFunction)PyBallTree_dualcount_radius,
         .ml_flags = METH_VARARGS,
         .ml_doc = "Count pairs within a radius with the dualtree algorithm"
+    },
+    {
+        .ml_name = "brute_range",
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_brute_range,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Count pairs within a range"
+    },
+    {
+        .ml_name = "count_range",
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_range,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Count pairs within a range"
     },
     {
         .ml_name = "dualcount_range",
