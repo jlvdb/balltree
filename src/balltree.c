@@ -92,11 +92,7 @@ void balltree_brute_range(
     for (long i = 0; i < tree->data->size; ++i) {
         double dist_sq = EUCLIDEAN_DIST_SQ(point, points + i);
         // increment corresponding bin by weight
-        HISTOGRAM_INSERT_DIST_SQ(hist, dist_sq, points[i].weight);
-    }
-    // scale counts by weight of query point
-    for (long i = 0; i < hist->size; ++i) {
-        hist->sum_weight[i] *= point->weight;
+        HISTOGRAM_INSERT_DIST_SQ(hist, dist_sq, point->weight * points[i].weight);
     }
 }
 

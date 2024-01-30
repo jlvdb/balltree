@@ -532,7 +532,7 @@ static PyObject *PyBallTree_accumulate_range(
     Point point;
     while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
         point.weight = data->weight_buffer[idx];
-        balltree_brute_range(self->balltree, &point, hist);
+        accumulator(self->balltree, &point, hist);
         ++idx;
     }
     PyObject *pycounts = PyObject_from_disthistogram(hist);
@@ -847,7 +847,7 @@ static PyObject *PyBallTree_brute_range(
     PyObject *args,
     PyObject *kwargs
 ) {
-    static char *kwlist[] = {"xyz", "r_edges", "weight", NULL};
+    static char *kwlist[] = {"xyz", "radii", "weight", NULL};
     PyObject *xyz_obj, *edges_obj, *weight_obj = Py_None;
     if (!PyArg_ParseTupleAndKeywords(
             args, kwargs, "OO|O", kwlist,
@@ -869,7 +869,7 @@ static PyObject *PyBallTree_count_range(
     PyObject *args,
     PyObject *kwargs
 ) {
-    static char *kwlist[] = {"xyz", "r_edges", "weight", NULL};
+    static char *kwlist[] = {"xyz", "radii", "weight", NULL};
     PyObject *xyz_obj, *edges_obj, *weight_obj = Py_None;
     if (!PyArg_ParseTupleAndKeywords(
             args, kwargs, "OO|O", kwlist,
