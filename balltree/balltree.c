@@ -878,18 +878,18 @@ static PyObject *PyBallTree_count_range(
     PyObject *args,
     PyObject *kwargs
 ) {
-    static char *kwlist[] = {"xyz", "rmin", "rmax", "weight", NULL};
-    PyObject *xyz_obj, *weight_obj = Py_None;
-    double rmin, rmax;
+    static char *kwlist[] = {"xyz", "r_edges", "weight", NULL};
+    PyObject *xyz_obj, *edges_obj, *weight_obj = Py_None;
     if (!PyArg_ParseTupleAndKeywords(
-            args, kwargs, "Odd|O", kwlist,
-            &xyz_obj, &rmin, &rmax, &weight_obj)
+            args, kwargs, "OO|O", kwlist,
+            &xyz_obj, &edges_obj, &weight_obj)
     ) {
         return NULL;
     }
 
     PyObject *pycount = NULL;  // return value
-    PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
+    PyArrayObject *xyz_arr = NULL, *edges_arr = NULL, *weight_arr = NULL;
+    DistHistogram *hist = NULL;
     NpyIterHelper *xyz_iter = NULL;
 
     // ensure that inputs are numpy arrays of correct type and shape
@@ -900,6 +900,16 @@ static PyObject *PyBallTree_count_range(
     npy_intp length = PyArray_DIM(xyz_arr, 0);
     if (length == 0) {
         PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
+        goto error;
+    }
+    edges_arr = weight_ensure_1dim_double(edges_obj);
+    if (edges_arr == NULL) {
+        goto error;
+    }
+    long num_edges = (long)PyArray_DIM(edges_arr, 0);
+    double *edges_buffer = PyArray_DATA(edges_arr);
+    hist = hist_new(num_edges, edges_buffer);
+    if (hist == NULL) {
         goto error;
     }
     weight_arr = weight_matched_1dim_double(weight_obj, length);
@@ -915,21 +925,32 @@ static PyObject *PyBallTree_count_range(
     double *weight_buffer = PyArray_DATA(weight_arr);
 
     // count neighbours for all inputs
-    double count = 0.0;
     long idx = 0;
     Point point;
     while (iter_get_next_xyz(xyz_iter, &point.x, &point.y, &point.z)) {
         point.weight = weight_buffer[idx];
-        count += balltree_count_range(self->balltree, &point, rmin, rmax);
+        balltree_count_range(self->balltree, &point, hist);
         ++idx;
     }
-    pycount = PyFloat_FromDouble(count);
+    npy_intp dims = {hist->size};
+    pycount = PyArray_SimpleNew(1, &dims, NPY_DOUBLE);
+    if (pycount == NULL) {
+        goto error;
+    }
+    double *count_buffer = PyArray_DATA(pycount);
+    for (long i = 0; i < hist->size; ++i) {
+        count_buffer[i] = hist->sum_weight[i];
+    }
 
 error:
     if (xyz_iter != NULL) {
         npyiterhelper_free(xyz_iter);
     }
+    if (hist != NULL) {
+        hist_free(hist);
+    }
     Py_XDECREF(weight_arr);
+    Py_XDECREF(edges_arr);
     Py_XDECREF(xyz_arr);
     return pycount;
 }
@@ -951,18 +972,42 @@ static PyObject *PyBallTree_dualcount_radius(PyBallTree *self, PyObject *args) {
 
 static PyObject *PyBallTree_dualcount_range(PyBallTree *self, PyObject *args) {
     PyBallTree *other_tree;
-    double rmin, rmax;
-    if (!PyArg_ParseTuple(args, "O!dd", &PyBallTreeType, &other_tree, &rmin, &rmax)) {
+    PyObject *edges_obj;
+    if (!PyArg_ParseTuple(args, "O!O", &PyBallTreeType, &other_tree, &edges_obj)) {
         return NULL;
     }
 
-    double count = balltree_dualcount_range(
-        self->balltree,
-        other_tree->balltree,
-        rmin,
-        rmax
-    );
-    return PyFloat_FromDouble(count);
+    PyObject *pycount = NULL;  // return value
+    PyArrayObject *edges_arr = NULL;
+    DistHistogram *hist = NULL;
+    edges_arr = weight_ensure_1dim_double(edges_obj);
+    if (edges_arr == NULL) {
+        goto error;
+    }
+    long num_edges = (long)PyArray_DIM(edges_arr, 0);
+    double *edges_buffer = PyArray_DATA(edges_arr);
+    hist = hist_new(num_edges, edges_buffer);
+    if (hist == NULL) {
+        goto error;
+    }
+
+    balltree_dualcount_range(self->balltree, other_tree->balltree, hist);
+    npy_intp dims = {hist->size};
+    pycount = PyArray_SimpleNew(1, &dims, NPY_DOUBLE);
+    if (pycount == NULL) {
+        goto error;
+    }
+    double *count_buffer = PyArray_DATA(pycount);
+    for (long i = 0; i < hist->size; ++i) {
+        count_buffer[i] = hist->sum_weight[i];
+    }
+
+error:
+    if (hist != NULL) {
+        hist_free(hist);
+    }
+    Py_XDECREF(edges_arr);
+    return pycount;
 }
 
 // PyBallTree definition ///////////////////////////////////////////////////////

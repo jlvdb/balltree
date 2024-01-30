@@ -7,18 +7,6 @@
 #include "balltree.h"
 #include "balltree_macros.h"
 
-static inline void ptslc_sumw_in_hist_sq(
-    const PointSlice *slice,
-    const Point *ref_point,
-    DistHistogram *hist
-) {
-    for (const Point *point = slice->start; point < slice->end; ++point) {
-        double dist_sq = EUCLIDEAN_DIST_SQ(ref_point, point);
-        // increment corresponding bin by weight
-        HISTOGRAM_INSERT_DIST_SQ(hist, dist_sq, point->weight);
-    }
-}
-
 BallTree *balltree_build(const PointBuffer *buffer) {
     return balltree_build_leafsize(buffer, DEFAULT_LEAFSIZE);
 }
@@ -100,12 +88,13 @@ void balltree_brute_range(
     const Point *point,
     DistHistogram *hist
 ) {
-    // avoid using *ptslc_from_buffer as the struct allocation could fail
-    PointSlice slice = {
-        .start = tree->data->points,
-        .end = tree->data->points + tree->data->size,
-    };
-    ptslc_sumw_in_hist_sq(&slice, point, hist);
+    Point *points = tree->data->points;
+    for (long i = 0; i < tree->data->size; ++i) {
+        double dist_sq = EUCLIDEAN_DIST_SQ(point, points + i);
+        // increment corresponding bin by weight
+        HISTOGRAM_INSERT_DIST_SQ(hist, dist_sq, points[i].weight);
+    }
+    // scale counts by weight of query point
     for (long i = 0; i < hist->size; ++i) {
         hist->sum_weight[i] *= point->weight;
     }
@@ -119,13 +108,12 @@ double balltree_count_radius(
     return bnode_count_radius(tree->root, point, radius);
 }
 
-double balltree_count_range(
+void balltree_count_range(
     const BallTree *tree,
     const Point *point,
-    double rmin,
-    double rmax
+    DistHistogram *hist
 ) {
-    return bnode_count_range(tree->root, point, rmin, rmax);
+    bnode_count_range(tree->root, point, hist);
 }
 
 double balltree_dualcount_radius(
@@ -136,13 +124,12 @@ double balltree_dualcount_radius(
     return bnode_dualcount_radius(tree1->root, tree2->root, radius);
 }
 
-double balltree_dualcount_range(
+void balltree_dualcount_range(
     const BallTree *tree1,
     const BallTree *tree2,
-    double rmin,
-    double rmax
+    DistHistogram *hist
 ) {
-    return bnode_dualcount_range(tree1->root, tree2->root, rmin, rmax);
+    bnode_dualcount_range(tree1->root, tree2->root, hist);
 }
 
 StatsVector *balltree_collect_stats(const BallTree *tree) {

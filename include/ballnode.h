@@ -56,9 +56,9 @@ PointSlice bnode_get_ptslc(const BallNode *);
 
 // from ballnode_query.c
 double bnode_count_radius(const BallNode *, const Point *, double);
-double bnode_count_range(const BallNode *, const Point *, double, double);
+void bnode_count_range(const BallNode *, const Point *, DistHistogram *);
 double bnode_dualcount_radius(const BallNode *, const BallNode *, double);
-double bnode_dualcount_range(const BallNode *, const BallNode *, double, double);
+void bnode_dualcount_range(const BallNode *, const BallNode *, DistHistogram *);
 
 // from ballnode_stats.c
 StatsVector *statvec_new_reserve(long);
