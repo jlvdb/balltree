@@ -2,7 +2,7 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-from balltree import coordinates, default_leafsize
+from balltree import default_leafsize
 from balltree.angulartree import AngularTree
 
 
@@ -49,14 +49,11 @@ def data_to_view(data, weight=True):
 class TestAngularTree:
     def test_init(self, mock_data):
         tree = AngularTree(mock_data)
-        xyz_tree = tree._tree.data
-        xyz_data = coordinates.angular_to_euclidean(mock_data)
-        npt.assert_almost_equal(xyz_data[:, 0], xyz_tree["x"])
-        npt.assert_almost_equal(xyz_data[:, 1], xyz_tree["y"])
-        npt.assert_almost_equal(xyz_data[:, 2], xyz_tree["z"])
+        npt.assert_array_equal(tree.data, data_to_view(mock_data))
 
-    def test_data(self, mock_tree, mock_data):
-        npt.assert_array_equal(mock_tree.data, data_to_view(mock_data))
+    def test_init_wrong_shape(self, mock_data):
+        with pytest.raises(ValueError, match="dimensions"):
+            AngularTree(mock_data[:, :-1])  # covers cases of method calls
 
     def test_num_data(self, mock_tree, mock_data):
         assert mock_tree.num_data == len(mock_data)
