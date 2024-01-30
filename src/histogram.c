@@ -19,13 +19,13 @@ Histogram *hist_new(long num_bins) {
     double *edges = calloc(num_bins + 1, sizeof(double));
     if (edges == NULL) {
         EMIT_ERR_MSG(MemoryError, "Histogram edges allocation failed");
-        binning_free(hist);
+        hist_free(hist);
         return NULL;
     }
     double *sum_weight = calloc(num_bins, sizeof(double));
     if (sum_weight == NULL) {
         EMIT_ERR_MSG(MemoryError, "Histogram sum_weight allocation failed");
-        binning_free(hist);
+        hist_free(hist);
         return NULL;
     }
 
