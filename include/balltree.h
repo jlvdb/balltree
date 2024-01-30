@@ -21,7 +21,7 @@ BallTree* balltree_build_nocopy(PointBuffer *, int);
 void balltree_free(BallTree *);
 
 double balltree_brute_radius(const BallTree *, const Point *, double);
-void balltree_brute_range(const BallTree *, const Point *, Histogram *);
+void balltree_brute_range(const BallTree *, const Point *, DistHistogram *);
 double balltree_count_radius(const BallTree *, const Point *, double);
 double balltree_count_range(const BallTree *, const Point *, double, double);
 double balltree_dualcount_radius(const BallTree *, const BallTree *, double);

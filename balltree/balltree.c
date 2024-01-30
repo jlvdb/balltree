@@ -746,7 +746,7 @@ static PyObject *PyBallTree_brute_range(
 
     PyObject *pycount = NULL;  // return value
     PyArrayObject *xyz_arr = NULL, *edges_arr = NULL, *weight_arr = NULL;
-    Histogram *hist = NULL;
+    DistHistogram *hist = NULL;
     NpyIterHelper *xyz_iter = NULL;
 
     // ensure that inputs are numpy arrays of correct type and shape

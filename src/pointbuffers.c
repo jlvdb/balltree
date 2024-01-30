@@ -22,7 +22,7 @@ PointBuffer *ptbuf_new(long size) {
     size_t n_bytes = size * sizeof(Point);
     Point *points = malloc(n_bytes);
     if (points == NULL) {
-        EMIT_ERR_MSG(MemoryError, "PointBuffer buffer allocation failed");
+        EMIT_ERR_MSG(MemoryError, "PointBuffer.points allocation failed");
         ptbuf_free(buffer);
         return NULL;
     }

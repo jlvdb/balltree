@@ -21,7 +21,7 @@ StatsVector *statvec_new_reserve(long reserve_capacity) {
 
     vec->stats = malloc(reserve_capacity * sizeof(NodeStats));
     if (vec->stats == NULL) {
-        EMIT_ERR_MSG(MemoryError, "StatsVector buffer allocation failed");
+        EMIT_ERR_MSG(MemoryError, "StatsVector.stats allocation failed");
         statvec_free(vec);
         return NULL;
     }

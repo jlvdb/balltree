@@ -3,26 +3,29 @@
 
 typedef struct {
     long size;
-    double *edges;
     double *sum_weight;
-    double max;
-} Histogram;
+    double *dist;
+    double dist_max;
+    double *dist_sq;
+    double dist_sq_max;
+} DistHistogram;
 
-#define HISTOGRAM_INSERT(hist, value, weight) \
+#define HISTOGRAM_INSERT_DIST_SQ(hist, dist_sq, weight) \
     ({ \
         long __bin_idx = -1; \
-        if ((value) <= (hist)->max) { \
+        if ((dist_sq) <= (hist)->dist_sq_max) { \
             for (__bin_idx = 0; __bin_idx <= hist->size; ++__bin_idx) { \
-                if ((value) <= (hist)->edges[__bin_idx]) { \
+                if ((dist_sq) <= (hist)->dist_sq[__bin_idx]) { \
                     (hist)->sum_weight[__bin_idx] += (weight); \
+                    break; \
                 } \
             } \
         } \
         __bin_idx; \
     })
 
-Histogram *hist_new(long, double *);
-void hist_free(Histogram *);
-long hist_insert(Histogram *, double, double);
+DistHistogram *hist_new(long, double *);
+void hist_free(DistHistogram *);
+long hist_insert(DistHistogram *, double, double);
 
 #endif /* HISTOGRAM_H */

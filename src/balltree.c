@@ -10,12 +10,12 @@
 static inline void ptslc_sumw_in_hist_sq(
     const PointSlice *slice,
     const Point *ref_point,
-    Histogram *hist
+    DistHistogram *hist
 ) {
     for (const Point *point = slice->start; point < slice->end; ++point) {
         double dist_sq = EUCLIDEAN_DIST_SQ(ref_point, point);
         // increment corresponding bin by weight
-        HISTOGRAM_INSERT(hist, dist_sq, point->weight);
+        HISTOGRAM_INSERT_DIST_SQ(hist, dist_sq, point->weight);
     }
 }
 
@@ -98,7 +98,7 @@ double balltree_brute_radius(
 void balltree_brute_range(
     const BallTree *tree,
     const Point *point,
-    Histogram *hist
+    DistHistogram *hist
 ) {
     // avoid using *ptslc_from_buffer as the struct allocation could fail
     PointSlice slice = {
