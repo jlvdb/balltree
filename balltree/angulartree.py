@@ -76,18 +76,6 @@ class AngularTree(BallTree):
         radius = coord.angle_to_chorddist(angle)
         return super().brute_radius(xyz, radius, weight)
 
-    def brute_range(
-        self,
-        radec: NDArray,
-        ang_min: float,
-        ang_max: float,
-        weight: NDArray | None = None,
-    ) -> float:
-        xyz = coord.angular_to_euclidean(radec)
-        rmin = coord.angle_to_chorddist(ang_min)
-        rmax = coord.angle_to_chorddist(ang_max)
-        return super().brute_range(xyz, rmin, rmax, weight)
-
     def count_radius(
         self,
         radec: NDArray,
@@ -97,18 +85,6 @@ class AngularTree(BallTree):
         xyz = coord.angular_to_euclidean(radec)
         radius = coord.angle_to_chorddist(angle)
         return super().count_radius(xyz, radius, weight)
-
-    def count_range(
-        self,
-        radec: NDArray,
-        ang_min: float,
-        ang_max: float,
-        weight: NDArray | None = None,
-    ) -> float:
-        xyz = coord.angular_to_euclidean(radec)
-        rmin = coord.angle_to_chorddist(ang_min)
-        rmax = coord.angle_to_chorddist(ang_max)
-        return super().count_range(xyz, rmin, rmax, weight)
 
     def dualcount_radius(
         self,
@@ -120,14 +96,32 @@ class AngularTree(BallTree):
         radius = coord.angle_to_chorddist(angle)
         return super().dualcount_radius(other, radius)
 
+    def brute_range(
+        self,
+        radec: NDArray,
+        angles: float,
+        weight: NDArray | None = None,
+    ) -> float:
+        xyz = coord.angular_to_euclidean(radec)
+        radii = coord.angle_to_chorddist(angles)
+        return super().brute_range(xyz, radii, weight)
+
+    def count_range(
+        self,
+        radec: NDArray,
+        angles: float,
+        weight: NDArray | None = None,
+    ) -> float:
+        xyz = coord.angular_to_euclidean(radec)
+        radii = coord.angle_to_chorddist(angles)
+        return super().count_range(xyz, radii, weight)
+
     def dualcount_range(
         self,
         other: AngularTree,
-        ang_min: float,
-        ang_max: float,
+        angles: float,
     ) -> float:
         if not isinstance(other, self.__class__):
             raise TypeError("'other' must be of type 'AngularTree'")
-        rmin = coord.angle_to_chorddist(ang_min)
-        rmax = coord.angle_to_chorddist(ang_max)
-        return super().dualcount_range(other, rmin, rmax)
+        radii = coord.angle_to_chorddist(angles)
+        return super().dualcount_range(other, radii)
