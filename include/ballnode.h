@@ -2,6 +2,7 @@
 #define BALLNODE_H
 
 #include "point.h"
+#include "histogram.h"
 
 #define BALLNODE_IS_LEAF(node) (node)->is_leaf
 

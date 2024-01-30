@@ -5,9 +5,9 @@
 #include "histogram.h"
 #include "balltree_macros.h"
 
-Histogram *hist_new(long num_edges, double *bin_edges) {
-    if (num_edges < 2) {
-        EMIT_ERR_MSG(ValueError, "Histogram requires at least 2 edges");
+Histogram *hist_new(long size, double *bin_edges) {
+    if (size < 1) {
+        EMIT_ERR_MSG(ValueError, "Histogram requires at least 1 edges");
         return NULL;
     }
 
@@ -17,28 +17,29 @@ Histogram *hist_new(long num_edges, double *bin_edges) {
         return NULL;
     }
 
-    size_t n_bytes = num_edges * sizeof(double);
+    size_t n_bytes = size * sizeof(double);
     double *edges = malloc(n_bytes);
     if (edges == NULL) {
         EMIT_ERR_MSG(MemoryError, "Histogram edges allocation failed");
         hist_free(hist);
         return NULL;
     }
-    for (long i = 0; i < num_edges; ++i) {
+    for (long i = 0; i < size; ++i) {
         double edge = bin_edges[i];
-        edges[i] = edge * edge;
+        edges[i] = edge * edge;  // TODO: danger!
     }
 
-    double *sum_weight = calloc(num_edges - 1, sizeof(double));
+    double *sum_weight = calloc(size, sizeof(double));
     if (sum_weight == NULL) {
         EMIT_ERR_MSG(MemoryError, "Histogram sum_weight allocation failed");
         hist_free(hist);
         return NULL;
     }
 
-    hist->num_bins = num_edges - 1;
+    hist->size = size;
     hist->edges = edges;
     hist->sum_weight = sum_weight;
+    hist->max = edges[size - 1];
     return hist;
 }
 
@@ -53,18 +54,5 @@ void hist_free(Histogram *hist) {
 }
 
 long hist_insert(Histogram *hist, double value, double weight) {
-    long num_bins = hist->num_bins;
-    if (value <= hist->edges[0]) {
-        return -1;
-    } else if (value > hist->edges[num_bins + 1]) {
-        return num_bins;
-    }
-    for (long edge_idx = 1; edge_idx <= num_bins; ++edge_idx) {
-        if (value <= hist->edges[edge_idx]) {
-            long bin_idx = edge_idx - 1;
-            hist->sum_weight[bin_idx] += weight;
-            return bin_idx;
-        }
-    }
-    return -2;  // this should not be reachable
+    return HISTOGRAM_INSERT(hist, value, weight);
 }

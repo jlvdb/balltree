@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "point.h"
+#include "histogram.h"
 #include "ballnode.h"
 #include "balltree_macros.h"
 

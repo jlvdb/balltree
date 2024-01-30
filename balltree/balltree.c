@@ -789,13 +789,13 @@ static PyObject *PyBallTree_brute_range(
         balltree_brute_range(self->balltree, &point, hist);
         ++idx;
     }
-    npy_intp dims = {num_edges - 1};
+    npy_intp dims = {hist->size};
     pycount = PyArray_SimpleNew(1, &dims, NPY_DOUBLE);
     if (pycount == NULL) {
         goto error;
     }
     double *count_buffer = PyArray_DATA(pycount);
-    for (long i = 0; i < hist->num_bins; ++i) {
+    for (long i = 0; i < hist->size; ++i) {
         count_buffer[i] = hist->sum_weight[i];
     }
 
