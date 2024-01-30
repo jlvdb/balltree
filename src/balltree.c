@@ -2,9 +2,35 @@
 #include <stdlib.h>
 
 #include "point.h"
+#include "histogram.h"
 #include "ballnode.h"
 #include "balltree.h"
 #include "balltree_macros.h"
+
+static inline void fast_hist_insert(Histogram *hist, double value, double weight) {
+    long num_bins = hist->num_bins;
+    if (hist->edges[0] < value && value > hist->edges[num_bins + 1]) {
+        for (long edge_idx = 1; edge_idx <= num_bins; ++edge_idx) {
+            if (value <= hist->edges[edge_idx]) {
+                long bin_idx = edge_idx - 1;
+                hist->sum_weight[bin_idx] += weight;
+                return;
+            }
+        }
+    }
+}
+
+static inline void ptslc_sumw_in_hist_sq(
+    const PointSlice *slice,
+    const Point *ref_point,
+    Histogram *hist
+) {
+    for (const Point *point = slice->start; point < slice->end; ++point) {
+        double dist_sq = EUCLIDEAN_DIST_SQ(ref_point, point);
+        // add point weight if condition is met otherwise zero
+        fast_hist_insert(hist, dist_sq, point->weight);
+    }
+}
 
 BallTree *balltree_build(const PointBuffer *buffer) {
     return balltree_build_leafsize(buffer, DEFAULT_LEAFSIZE);
@@ -82,18 +108,20 @@ double balltree_brute_radius(
     return point->weight * ptslc_sumw_in_radius_sq(&slice, point, radius * radius);
 }
 
-double balltree_brute_range(
+void balltree_brute_range(
     const BallTree *tree,
     const Point *point,
-    double rmin,
-    double rmax
+    Histogram *hist
 ) {
     // avoid using *ptslc_from_buffer as the struct allocation could fail
     PointSlice slice = {
         .start = tree->data->points,
         .end = tree->data->points + tree->data->size,
     };
-    return point->weight * ptslc_sumw_in_range_sq(&slice, point, rmin * rmin, rmax * rmax);
+    ptslc_sumw_in_hist_sq(&slice, point, hist);
+    for (long i = 0; i < hist->num_bins; ++i) {
+        hist->sum_weight[i] *= point->weight;
+    }
 }
 
 double balltree_count_radius(

@@ -2,6 +2,7 @@
 #define BALLTREE_H
 
 #include "point.h"
+#include "histogram.h"
 #include "ballnode.h"
 
 #define DEFAULT_LEAFSIZE 20
@@ -20,7 +21,7 @@ BallTree* balltree_build_nocopy(PointBuffer *, int);
 void balltree_free(BallTree *);
 
 double balltree_brute_radius(const BallTree *, const Point *, double);
-double balltree_brute_range(const BallTree *, const Point *, double, double);
+void balltree_brute_range(const BallTree *, const Point *, Histogram *);
 double balltree_count_radius(const BallTree *, const Point *, double);
 double balltree_count_range(const BallTree *, const Point *, double, double);
 double balltree_dualcount_radius(const BallTree *, const BallTree *, double);

@@ -7,7 +7,7 @@ typedef struct {
     double *sum_weight;
 } Histogram;
 
-Histogram *hist_new(long);
+Histogram *hist_new(long, double *);
 void hist_free(Histogram *);
 long hist_insert(Histogram *, double, double);
 

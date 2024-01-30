@@ -1,12 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "histogram.h"
 #include "balltree_macros.h"
 
-Histogram *hist_new(long num_bins) {
-    if (num_bins < 1) {
-        EMIT_ERR_MSG(ValueError, "Histogram num_bins must be positive");
+Histogram *hist_new(long num_edges, double *bin_edges) {
+    if (num_edges < 2) {
+        EMIT_ERR_MSG(ValueError, "Histogram requires at least 2 edges");
         return NULL;
     }
 
@@ -16,20 +17,26 @@ Histogram *hist_new(long num_bins) {
         return NULL;
     }
 
-    double *edges = calloc(num_bins + 1, sizeof(double));
+    size_t n_bytes = num_edges * sizeof(double);
+    double *edges = malloc(n_bytes);
     if (edges == NULL) {
         EMIT_ERR_MSG(MemoryError, "Histogram edges allocation failed");
         hist_free(hist);
         return NULL;
     }
-    double *sum_weight = calloc(num_bins, sizeof(double));
+    for (long i = 0; i < num_edges; ++i) {
+        double edge = bin_edges[i];
+        edges[i] = edge * edge;
+    }
+
+    double *sum_weight = calloc(num_edges - 1, sizeof(double));
     if (sum_weight == NULL) {
         EMIT_ERR_MSG(MemoryError, "Histogram sum_weight allocation failed");
         hist_free(hist);
         return NULL;
     }
 
-    hist->num_bins = num_bins;
+    hist->num_bins = num_edges - 1;
     hist->edges = edges;
     hist->sum_weight = sum_weight;
     return hist;
