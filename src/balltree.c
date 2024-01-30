@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "point.h"
+#include "histogram.h"
 #include "ballnode.h"
 #include "balltree.h"
 #include "balltree_macros.h"
@@ -82,18 +83,17 @@ double balltree_brute_radius(
     return point->weight * ptslc_sumw_in_radius_sq(&slice, point, radius * radius);
 }
 
-double balltree_brute_range(
+void balltree_brute_range(
     const BallTree *tree,
     const Point *point,
-    double rmin,
-    double rmax
+    DistHistogram *hist
 ) {
-    // avoid using *ptslc_from_buffer as the struct allocation could fail
-    PointSlice slice = {
-        .start = tree->data->points,
-        .end = tree->data->points + tree->data->size,
-    };
-    return point->weight * ptslc_sumw_in_range_sq(&slice, point, rmin * rmin, rmax * rmax);
+    Point *points = tree->data->points;
+    for (long i = 0; i < tree->data->size; ++i) {
+        double dist_sq = EUCLIDEAN_DIST_SQ(point, points + i);
+        // increment corresponding bin by weight
+        HISTOGRAM_INSERT_DIST_SQ(hist, dist_sq, point->weight * points[i].weight);
+    }
 }
 
 double balltree_count_radius(
@@ -104,13 +104,12 @@ double balltree_count_radius(
     return bnode_count_radius(tree->root, point, radius);
 }
 
-double balltree_count_range(
+void balltree_count_range(
     const BallTree *tree,
     const Point *point,
-    double rmin,
-    double rmax
+    DistHistogram *hist
 ) {
-    return bnode_count_range(tree->root, point, rmin, rmax);
+    bnode_count_range(tree->root, point, hist);
 }
 
 double balltree_dualcount_radius(
@@ -121,13 +120,12 @@ double balltree_dualcount_radius(
     return bnode_dualcount_radius(tree1->root, tree2->root, radius);
 }
 
-double balltree_dualcount_range(
+void balltree_dualcount_range(
     const BallTree *tree1,
     const BallTree *tree2,
-    double rmin,
-    double rmax
+    DistHistogram *hist
 ) {
-    return bnode_dualcount_range(tree1->root, tree2->root, rmin, rmax);
+    bnode_dualcount_range(tree1->root, tree2->root, hist);
 }
 
 StatsVector *balltree_collect_stats(const BallTree *tree) {

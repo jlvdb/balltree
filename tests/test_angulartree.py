@@ -2,12 +2,15 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-from balltree import coordinates, default_leafsize
+from balltree import default_leafsize
 from balltree.angulartree import AngularTree
+
+PI_2 = np.pi / 2.0
 
 
 @pytest.fixture
 def mock_data():
+    # NOTE: if values are changed, test_angles, test_count, test_count_range change
     return np.deg2rad(
         [
             [0.0, 0.0],
@@ -36,6 +39,22 @@ def mock_tree(mock_data):
     return AngularTree(mock_data)
 
 
+@pytest.fixture
+def test_angles():
+    eps = 1e-9
+    return np.array([PI_2 - eps, PI_2 + eps, np.pi])
+
+
+@pytest.fixture
+def test_count():
+    return np.array([1.0, 5.0, 6.0])
+
+
+@pytest.fixture
+def test_count_range():
+    return np.diff([1, 5, 6], prepend=0.0)  # prepend is for count with itself
+
+
 def data_to_view(data, weight=True):
     dtype = [("ra", "f8"), ("dec", "f8"), ("weight", "f8")]
     data = np.atleast_2d(data)
@@ -49,14 +68,11 @@ def data_to_view(data, weight=True):
 class TestAngularTree:
     def test_init(self, mock_data):
         tree = AngularTree(mock_data)
-        xyz_tree = tree._tree.data
-        xyz_data = coordinates.angular_to_euclidean(mock_data)
-        npt.assert_almost_equal(xyz_data[:, 0], xyz_tree["x"])
-        npt.assert_almost_equal(xyz_data[:, 1], xyz_tree["y"])
-        npt.assert_almost_equal(xyz_data[:, 2], xyz_tree["z"])
+        npt.assert_array_equal(tree.data, data_to_view(mock_data))
 
-    def test_data(self, mock_tree, mock_data):
-        npt.assert_array_equal(mock_tree.data, data_to_view(mock_data))
+    def test_init_wrong_shape(self, mock_data):
+        with pytest.raises(ValueError, match="dimensions"):
+            AngularTree(mock_data[:, :-1])  # covers cases of method calls
 
     def test_num_data(self, mock_tree, mock_data):
         assert mock_tree.num_data == len(mock_data)
@@ -100,47 +116,35 @@ class TestAngularTree:
     def test_count_nodes(self, mock_data):
         assert AngularTree(mock_data, leafsize=4).count_nodes() == 3
 
-    def test_brute_radius(self, mock_tree):
-        point = (0.0, 0.0, 0.0)
-        eps = 1e-9
-        radius = np.pi / 2.0
-        assert mock_tree.brute_radius(point, radius - eps) == 1
-        assert mock_tree.brute_radius(point, radius + eps) == 5
-        assert mock_tree.brute_radius(point, 2.0 * radius + eps) == 6
+    def test_brute_radius(self, mock_tree, test_angles, test_count):
+        point = (0.0, 0.0)
+        for angle, count in zip(test_angles, test_count):
+            assert mock_tree.brute_radius(point, angle) == count
 
-    def test_brute_range(self, mock_tree):
-        point = (0.0, 0.0, 0.0)
-        eps = 1e-9
-        radius = np.pi / 2.0
-        assert mock_tree.brute_range(point, radius - eps, 2.0 * radius + eps) == 5
+    def test_count_radius(self, mock_tree, test_angles, test_count):
+        point = (0.0, 0.0)
+        for angle, count in zip(test_angles, test_count):
+            assert mock_tree.count_radius(point, angle) == count
 
-    def test_count_radius(self, mock_tree):
-        point = (0.0, 0.0, 0.0)
-        eps = 1e-9
-        radius = np.pi / 2.0
-        assert mock_tree.count_radius(point, radius - eps) == 1
-        assert mock_tree.count_radius(point, radius + eps) == 5
-        assert mock_tree.count_radius(point, 2.0 * radius + eps) == 6
-
-    def test_count_range(self, mock_tree):
-        point = (0.0, 0.0, 0.0)
-        eps = 1e-9
-        radius = np.pi / 2.0
-        assert mock_tree.count_range(point, radius - eps, 2.0 * radius + eps) == 5
-
-    def test_dualcount_radius(self, mock_tree):
-        eps = 1e-9
-        radius = np.pi / 2.0
+    def test_dualcount_radius(self, mock_tree, test_angles, test_count):
         N = mock_tree.num_data
-        assert mock_tree.dualcount_radius(mock_tree, radius - eps) == 1 * N
-        assert mock_tree.dualcount_radius(mock_tree, radius + eps) == 5 * N
-        assert mock_tree.dualcount_radius(mock_tree, 2.0 * radius + eps) == 6 * N
+        for angle, count in zip(test_angles, test_count):
+            assert mock_tree.dualcount_radius(mock_tree, angle) == N * count
 
-    def test_dualcount_range(self, mock_tree):
-        eps = 1e-9
-        radius = np.pi / 2.0
+    def test_brute_range(self, mock_tree, test_angles, test_count_range):
+        point = (0.0, 0.0)
+        npt.assert_array_almost_equal(
+            mock_tree.brute_range(point, test_angles), test_count_range
+        )
+
+    def test_count_range(self, mock_tree, test_angles, test_count_range):
+        point = (0.0, 0.0)
+        npt.assert_array_almost_equal(
+            mock_tree.count_range(point, test_angles), test_count_range
+        )
+
+    def test_dualcount_range(self, mock_tree, test_angles, test_count_range):
         N = mock_tree.num_data
-        assert (
-            mock_tree.dualcount_range(mock_tree, radius - eps, 2.0 * radius + eps)
-            == 5 * N
+        npt.assert_array_almost_equal(
+            mock_tree.dualcount_range(mock_tree, test_angles), test_count_range * N
         )

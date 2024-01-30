@@ -1,63 +1,77 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "histogram.h"
 #include "balltree_macros.h"
 
-Histogram *hist_new(long num_bins) {
-    if (num_bins < 1) {
-        EMIT_ERR_MSG(ValueError, "Histogram num_bins must be positive");
+DistHistogram *hist_new(long size, double *dist_edges) {
+    if (size < 1) {
+        EMIT_ERR_MSG(ValueError, "DistHistogram requires at least 1 edges");
         return NULL;
     }
+    size_t n_bytes_double = size * sizeof(double);
 
-    Histogram *hist = malloc(sizeof(Histogram));
+    DistHistogram *hist = malloc(sizeof(DistHistogram));
     if (hist == NULL) {
-        EMIT_ERR_MSG(MemoryError, "Histogram allocation failed");
+        EMIT_ERR_MSG(MemoryError, "DistHistogram allocation failed");
         return NULL;
     }
+    hist->size = size;
 
-    double *edges = calloc(num_bins + 1, sizeof(double));
-    if (edges == NULL) {
-        EMIT_ERR_MSG(MemoryError, "Histogram edges allocation failed");
-        hist_free(hist);
-        return NULL;
-    }
-    double *sum_weight = calloc(num_bins, sizeof(double));
+    // allocate and initialise hist.sum_weight buffer
+    double *sum_weight = calloc(size, sizeof(double));
     if (sum_weight == NULL) {
-        EMIT_ERR_MSG(MemoryError, "Histogram sum_weight allocation failed");
+        EMIT_ERR_MSG(MemoryError, "DistHistogram.sum_weight allocation failed");
         hist_free(hist);
         return NULL;
     }
-
-    hist->num_bins = num_bins;
-    hist->edges = edges;
     hist->sum_weight = sum_weight;
+
+    // allocate hist.dist buffer
+    double *dist = malloc(n_bytes_double);
+    if (dist == NULL) {
+        EMIT_ERR_MSG(MemoryError, "DistHistogram.dist allocation failed");
+        hist_free(hist);
+        return NULL;
+    }
+    hist->dist = dist;
+
+    // allocate hist.dist_sq buffer
+    double *dist_sq = malloc(n_bytes_double);
+    if (dist_sq == NULL) {
+        EMIT_ERR_MSG(MemoryError, "DistHistogram.dist_sq allocation failed");
+        hist_free(hist);
+        return NULL;
+    }
+    hist->dist_sq = dist_sq;
+
+    // initialise dist/_sq buffers
+    double edge = 0.0;
+    for (long i = 0; i < size; ++i) {
+        edge = dist_edges[i];
+        dist[i] = edge;
+        dist_sq[i] = edge * edge;
+    }
+    hist->dist_max = edge;
+    hist->dist_sq_max = edge * edge;
     return hist;
 }
 
-void hist_free(Histogram *hist) {
-    if (hist->edges != NULL) {
-        free(hist->edges);
-    }
+void hist_free(DistHistogram *hist) {
     if (hist->sum_weight != NULL) {
         free(hist->sum_weight);
+    }
+    if (hist->dist != NULL) {
+        free(hist->dist);
+    }
+    if (hist->dist_sq != NULL) {
+        free(hist->dist_sq);
     }
     free(hist);
 }
 
-long hist_insert(Histogram *hist, double value, double weight) {
-    long num_bins = hist->num_bins;
-    if (value <= hist->edges[0]) {
-        return -1;
-    } else if (value > hist->edges[num_bins + 1]) {
-        return num_bins;
-    }
-    for (long edge_idx = 1; edge_idx <= num_bins; ++edge_idx) {
-        if (value <= hist->edges[edge_idx]) {
-            long bin_idx = edge_idx - 1;
-            hist->sum_weight[bin_idx] += weight;
-            return bin_idx;
-        }
-    }
-    return -2;  // this should not be reachable
+long hist_insert(DistHistogram *hist, double distance, double weight) {
+    double dist_sq = distance * distance;
+    return HISTOGRAM_INSERT_DIST_SQ(hist, dist_sq, weight);
 }

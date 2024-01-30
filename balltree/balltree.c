@@ -8,6 +8,9 @@
 #include "balltree.h"
 #include "balltree_macros.h"
 
+typedef double (*count_radius_func)(const BallTree *, const Point *, double);
+typedef void (*count_range_func)(const BallTree *, const Point *, DistHistogram *);
+
 typedef struct {
     NpyIter *iter;
     NpyIter_IterNextFunc *next;
@@ -17,6 +20,20 @@ typedef struct {
     npy_intp idx;
 } NpyIterHelper;
 
+typedef struct {
+    long size;
+    PyArrayObject *xyz_arr;
+    NpyIterHelper *xyz_iter;
+    PyArrayObject *weight_arr;
+    double *weight_buffer;
+} InputIterData;
+
+typedef struct {
+    PyObject_HEAD
+    BallTree *balltree;
+} PyBallTree;
+static PyTypeObject PyBallTreeType;
+
 // helper functions
 static NpyIterHelper *npyiterhelper_new(PyArrayObject *xyz_arr);
 static void npyiterhelper_free(NpyIterHelper *iter);
@@ -24,18 +41,18 @@ static inline int iter_get_next_xyz(NpyIterHelper *iter, double *x, double *y, d
 static const char *PyString_to_char(PyObject* py_string);
 static PyArrayObject *ensure_numpy_array_double(PyObject *obj);
 PyArrayObject *numpy_array_add_dim(PyArrayObject* array);
+static PyArrayObject *ensure_numpy_array_1dim_double(PyObject *weight_obj);
 static PyArrayObject *xyz_ensure_2dim_double(PyObject *xyz_obj);
-static PyArrayObject *weight_ensure_1dim_double(PyObject *weight_obj);
 static PyArrayObject *weight_matched_1dim_double(PyObject *weight_obj, npy_intp length);
+static InputIterData *inputiterdata_new(PyObject *xyz_obj, PyObject *weight_obj);
+void inputiterdata_free(InputIterData *);
 static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj);
 static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer);
 static PyObject *statvec_get_numpy_array(StatsVector *vec);
-
-typedef struct {
-    PyObject_HEAD
-    BallTree *balltree;
-} PyBallTree;
-static PyTypeObject PyBallTreeType;
+static DistHistogram *disthistogram_from_PyObject(PyObject *edges_obj);
+static PyObject *PyObject_from_disthistogram(DistHistogram *hist);
+static PyObject *PyBallTree_accumulate_radius(PyBallTree *self, count_radius_func accumulator, PyObject *xyz_obj, double radius, PyObject *weight_obj);
+static PyObject *PyBallTree_accumulate_range(PyBallTree *self, count_range_func accumulator, PyObject *xyz_obj, PyObject *edges_obj, PyObject *weight_obj);
 
 // PyBallTree: constructors & deallocators
 static PyObject *PyBallTree_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
@@ -56,10 +73,10 @@ static PyObject *PyBallTree_to_file(PyBallTree *self, PyObject *args);
 static PyObject *PyBallTree_count_nodes(PyBallTree *self);
 static PyObject *PyBallTree_get_node_data(PyBallTree *self);
 static PyObject *PyBallTree_brute_radius(PyBallTree *self, PyObject *args, PyObject *kwargs);
-static PyObject *PyBallTree_brute_range(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_count_radius(PyBallTree *self, PyObject *args, PyObject *kwargs);
-static PyObject *PyBallTree_count_range(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_dualcount_radius(PyBallTree *self, PyObject *args);
+static PyObject *PyBallTree_brute_range(PyBallTree *self, PyObject *args, PyObject *kwargs);
+static PyObject *PyBallTree_count_range(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_dualcount_range(PyBallTree *self, PyObject *args);
 
 
@@ -200,6 +217,38 @@ PyArrayObject *numpy_array_add_dim(PyArrayObject* array) {
     return reshaped;
 }
 
+static PyArrayObject *ensure_numpy_array_1dim_double(PyObject *weight_obj) {
+    PyObject *weight_seq;
+    PyArrayObject *weight_arr;
+    const npy_int ndim_expected = 1;
+
+    // ensure that input is a sequence at minimum
+    if (PyArray_IsAnyScalar(weight_obj)) {
+        weight_seq = Py_BuildValue("(O)", weight_obj);
+        if (weight_seq == NULL) {
+            return NULL;
+        }
+    } else {
+        weight_seq = weight_obj;
+        Py_INCREF(weight_seq);  // consistency with branch above
+    }
+
+    weight_arr = ensure_numpy_array_double(weight_seq);
+    Py_DECREF(weight_seq);
+    if (weight_arr == NULL) {
+        return NULL;
+    }
+
+    // check that array has correct number of dimensions
+    npy_int ndim = PyArray_NDIM(weight_arr);
+    if (ndim != ndim_expected) {
+        PyErr_SetString(PyExc_ValueError, "'weight' must be scalar or of shape (N,)");
+        Py_DECREF(weight_arr);
+        return NULL;
+    }
+    return weight_arr;
+}
+
 static PyArrayObject *xyz_ensure_2dim_double(PyObject *xyz_obj) {
     PyArrayObject *xyz_arr, *xyz_arr_2dim;
     const npy_int dim1_expected = 3;
@@ -236,38 +285,6 @@ static PyArrayObject *xyz_ensure_2dim_double(PyObject *xyz_obj) {
     return xyz_arr_2dim;
 }
 
-static PyArrayObject *weight_ensure_1dim_double(PyObject *weight_obj) {
-    PyObject *weight_seq;
-    PyArrayObject *weight_arr;
-    const npy_int ndim_expected = 1;
-
-    // ensure that input is a sequence at minimum
-    if (PyArray_IsAnyScalar(weight_obj)) {
-        weight_seq = Py_BuildValue("(O)", weight_obj);
-        if (weight_seq == NULL) {
-            return NULL;
-        }
-    } else {
-        weight_seq = weight_obj;
-        Py_INCREF(weight_seq);  // consistency with branch above
-    }
-
-    weight_arr = ensure_numpy_array_double(weight_seq);
-    Py_DECREF(weight_seq);
-    if (weight_arr == NULL) {
-        return NULL;
-    }
-
-    // check that array has correct number of dimensions
-    npy_int ndim = PyArray_NDIM(weight_arr);
-    if (ndim != ndim_expected) {
-        PyErr_SetString(PyExc_ValueError, "'weight' must be scalar or of shape (N,)");
-        Py_DECREF(weight_arr);
-        return NULL;
-    }
-    return weight_arr;
-}
-
 static PyArrayObject *weight_matched_1dim_double(PyObject *weight_obj, npy_intp length) {
     PyArrayObject *weight_arr;
 
@@ -288,7 +305,7 @@ static PyArrayObject *weight_matched_1dim_double(PyObject *weight_obj, npy_intp 
 
     // try converting input to numpy array with correct type and shape
     else {
-        weight_arr = weight_ensure_1dim_double(weight_obj);
+        weight_arr = ensure_numpy_array_1dim_double(weight_obj);
         if (weight_arr == NULL) {
             return NULL;
         }
@@ -302,51 +319,68 @@ static PyArrayObject *weight_matched_1dim_double(PyObject *weight_obj, npy_intp 
     return weight_arr;
 }
 
-static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj) {
-    PointBuffer *buffer = NULL;  // return value
-    PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
-    NpyIterHelper *xyz_iter = NULL;
-
-    // ensure that inputs are numpy arrays of correct type and shape
-    xyz_arr = xyz_ensure_2dim_double(xyz_obj);
-    if (xyz_arr == NULL) {
+static InputIterData *inputiterdata_new(PyObject *xyz_obj, PyObject *weight_obj) {
+    InputIterData *data = calloc(1, sizeof(InputIterData));
+    if (data == NULL) {
         return NULL;
     }
-    npy_intp length = PyArray_DIM(xyz_arr, 0);
-    if (length == 0) {
-        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
-        goto error;
+
+    // ensure that inputs are numpy arrays of correct type and shape
+    data->xyz_arr = xyz_ensure_2dim_double(xyz_obj);
+    if (data->xyz_arr == NULL) {
+        inputiterdata_free(data);
+        return NULL;
     }
-    weight_arr = weight_matched_1dim_double(weight_obj, length);
-    if (weight_arr == NULL) {
-        goto error;
+    data->size = PyArray_DIM(data->xyz_arr, 0);
+    if (data->size == 0) {
+        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
+        inputiterdata_free(data);
+        return NULL;
+    }
+    data->weight_arr = weight_matched_1dim_double(weight_obj, data->size);
+    if (data->weight_arr == NULL) {
+        inputiterdata_free(data);
+        return NULL;
     }
 
     // get an iterator for input data
-    xyz_iter = npyiterhelper_new(xyz_arr);
-    if (xyz_iter == NULL) {
-        goto error;
+    data->xyz_iter = npyiterhelper_new(data->xyz_arr);
+    if (data->xyz_iter == NULL) {
+        inputiterdata_free(data);
+        return NULL;
     }
-    double *weight_buffer = PyArray_DATA(weight_arr);
+    data->weight_buffer = PyArray_DATA(data->weight_arr);
 
+    return data;
+}
+
+void inputiterdata_free(InputIterData *data) {
+    Py_XDECREF(data->xyz_arr);
+    if (data->xyz_iter != NULL) {
+        npyiterhelper_free(data->xyz_iter);
+    }
+    Py_XDECREF(data->weight_arr);
+    free(data);
+}
+
+static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj) {
+    InputIterData *data = inputiterdata_new(xyz_obj, weight_obj);
+    if (data == NULL) {
+        return NULL;
+    }
     // build and fill point buffer
-    buffer = ptbuf_new(length);
+    PointBuffer *buffer = ptbuf_new(data->size);
     if (buffer == NULL) {
-        goto error;
+        inputiterdata_free(data);
+        return NULL;
     }
     long idx = 0;
     double x, y, z;
-    while (iter_get_next_xyz(xyz_iter, &x, &y, &z)) {
-        buffer->points[idx] = (Point){x, y, z, weight_buffer[idx]};
+    while (iter_get_next_xyz(data->xyz_iter, &x, &y, &z)) {
+        buffer->points[idx] = (Point){x, y, z, data->weight_buffer[idx]};
         ++idx;
     }
-
-error:
-    if (xyz_iter != NULL) {
-        npyiterhelper_free(xyz_iter);
-    }
-    Py_XDECREF(weight_arr);
-    Py_XDECREF(xyz_arr);
+    inputiterdata_free(data);
     return buffer;
 }
 
@@ -390,6 +424,31 @@ static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
     return view;
 }
 
+static DistHistogram *disthistogram_from_PyObject(PyObject *edges_obj) {
+    PyArrayObject *edges_arr = ensure_numpy_array_1dim_double(edges_obj);
+    if (edges_arr == NULL) {
+        return NULL;
+    }
+    long num_edges = (long)PyArray_DIM(edges_arr, 0);
+    double *edges_buffer = PyArray_DATA(edges_arr);
+    DistHistogram *hist = hist_new(num_edges, edges_buffer);
+    Py_DECREF(edges_arr);
+    return hist;
+}
+
+static PyObject *PyObject_from_disthistogram(DistHistogram *hist) {
+    npy_intp dims = {hist->size};
+    PyObject *pycount = PyArray_SimpleNew(1, &dims, NPY_DOUBLE);
+    if (pycount == NULL) {
+        return NULL;
+    }
+    double *count_buffer = PyArray_DATA(pycount);
+    for (long i = 0; i < hist->size; ++i) {
+        count_buffer[i] = hist->sum_weight[i];
+    }
+    return pycount;
+}
+
 static PyObject *statvec_get_numpy_array(StatsVector *vec) {
     const npy_intp ndim = 1;
     npy_intp shape[1] = {vec->size};
@@ -426,6 +485,60 @@ static PyObject *statvec_get_numpy_array(StatsVector *vec) {
     void *ptr = PyArray_DATA(array);
     memcpy(ptr, vec->stats, sizeof(NodeStats) * vec->size);
     return array;
+}
+
+static PyObject *PyBallTree_accumulate_radius(
+    PyBallTree *self,
+    count_radius_func accumulator,
+    PyObject *xyz_obj,
+    double radius,
+    PyObject *weight_obj
+) {
+    InputIterData *data = inputiterdata_new(xyz_obj, weight_obj);
+    if (data == NULL) {
+        return NULL;
+    }
+    // count neighbours for all inputs
+    double count = 0.0;
+    long idx = 0;
+    Point point;
+    while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
+        point.weight = data->weight_buffer[idx];
+        count += accumulator(self->balltree, &point, radius);
+        ++idx;
+    }
+    inputiterdata_free(data);
+    return PyFloat_FromDouble(count);
+}
+
+static PyObject *PyBallTree_accumulate_range(
+    PyBallTree *self,
+    count_range_func accumulator,
+    PyObject *xyz_obj,
+    PyObject *edges_obj,
+    PyObject *weight_obj
+) {
+    InputIterData *data = inputiterdata_new(xyz_obj, weight_obj);
+    if (data == NULL) {
+        return NULL;
+    }
+    DistHistogram *hist = disthistogram_from_PyObject(edges_obj);
+    if (hist == NULL) {
+        inputiterdata_free(data);
+        return NULL;
+    }
+    // count neighbours for all inputs
+    long idx = 0;
+    Point point;
+    while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
+        point.weight = data->weight_buffer[idx];
+        accumulator(self->balltree, &point, hist);
+        ++idx;
+    }
+    PyObject *pycounts = PyObject_from_disthistogram(hist);
+    inputiterdata_free(data);
+    hist_free(hist);
+    return pycounts;
 }
 
 // PyBallTree: constructors & deallocators /////////////////////////////////////
@@ -683,112 +796,13 @@ static PyObject *PyBallTree_brute_radius(
     ) {
         return NULL;
     }
-
-    PyObject *pycount = NULL;  // return value
-    PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
-    NpyIterHelper *xyz_iter = NULL;
-
-    // ensure that inputs are numpy arrays of correct type and shape
-    xyz_arr = xyz_ensure_2dim_double(xyz_obj);
-    if (xyz_arr == NULL) {
-        return NULL;
-    }
-    npy_intp length = PyArray_DIM(xyz_arr, 0);
-    if (length == 0) {
-        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
-        goto error;
-    }
-    weight_arr = weight_matched_1dim_double(weight_obj, length);
-    if (weight_arr == NULL) {
-        goto error;
-    }
-
-    // get an iterator for input data
-    xyz_iter = npyiterhelper_new(xyz_arr);
-    if (xyz_iter == NULL) {
-        goto error;
-    }
-    double *weight_buffer = PyArray_DATA(weight_arr);
-
-    // count neighbours for all inputs
-    double count = 0.0;
-    long idx = 0;
-    Point point;
-    while (iter_get_next_xyz(xyz_iter, &point.x, &point.y, &point.z)) {
-        point.weight = weight_buffer[idx];
-        count += balltree_brute_radius(self->balltree, &point, radius);
-        ++idx;
-    }
-    pycount = PyFloat_FromDouble(count);
-
-error:
-    if (xyz_iter != NULL) {
-        npyiterhelper_free(xyz_iter);
-    }
-    Py_XDECREF(weight_arr);
-    Py_XDECREF(xyz_arr);
-    return pycount;
-}
-
-static PyObject *PyBallTree_brute_range(
-    PyBallTree *self,
-    PyObject *args,
-    PyObject *kwargs
-) {
-    static char *kwlist[] = {"xyz", "rmin", "rmax", "weight", NULL};
-    PyObject *xyz_obj, *weight_obj = Py_None;
-    double rmin, rmax;
-    if (!PyArg_ParseTupleAndKeywords(
-            args, kwargs, "Odd|O", kwlist,
-            &xyz_obj, &rmin, &rmax, &weight_obj)
-    ) {
-        return NULL;
-    }
-
-    PyObject *pycount = NULL;  // return value
-    PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
-    NpyIterHelper *xyz_iter = NULL;
-
-    // ensure that inputs are numpy arrays of correct type and shape
-    xyz_arr = xyz_ensure_2dim_double(xyz_obj);
-    if (xyz_arr == NULL) {
-        return NULL;
-    }
-    npy_intp length = PyArray_DIM(xyz_arr, 0);
-    if (length == 0) {
-        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
-        goto error;
-    }
-    weight_arr = weight_matched_1dim_double(weight_obj, length);
-    if (weight_arr == NULL) {
-        goto error;
-    }
-
-    // get an iterator for input data
-    xyz_iter = npyiterhelper_new(xyz_arr);
-    if (xyz_iter == NULL) {
-        goto error;
-    }
-    double *weight_buffer = PyArray_DATA(weight_arr);
-
-    // count neighbours for all inputs
-    double count = 0.0;
-    long idx = 0;
-    Point point;
-    while (iter_get_next_xyz(xyz_iter, &point.x, &point.y, &point.z)) {
-        point.weight = weight_buffer[idx];
-        count += balltree_brute_range(self->balltree, &point, rmin, rmax);
-        ++idx;
-    }
-    pycount = PyFloat_FromDouble(count);
-
-error:
-    if (xyz_iter != NULL) {
-        npyiterhelper_free(xyz_iter);
-    }
-    Py_XDECREF(weight_arr);
-    Py_XDECREF(xyz_arr);
-    return pycount;
+    return PyBallTree_accumulate_radius(
+        self,
+        balltree_brute_radius,
+        xyz_obj,
+        radius,
+        weight_obj
+    );
 }
 
 static PyObject *PyBallTree_count_radius(
@@ -805,112 +819,13 @@ static PyObject *PyBallTree_count_radius(
     ) {
         return NULL;
     }
-
-    PyObject *pycount = NULL;  // return value
-    PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
-    NpyIterHelper *xyz_iter = NULL;
-
-    // ensure that inputs are numpy arrays of correct type and shape
-    xyz_arr = xyz_ensure_2dim_double(xyz_obj);
-    if (xyz_arr == NULL) {
-        return NULL;
-    }
-    npy_intp length = PyArray_DIM(xyz_arr, 0);
-    if (length == 0) {
-        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
-        goto error;
-    }
-    weight_arr = weight_matched_1dim_double(weight_obj, length);
-    if (weight_arr == NULL) {
-        goto error;
-    }
-
-    // get an iterator for input data
-    xyz_iter = npyiterhelper_new(xyz_arr);
-    if (xyz_iter == NULL) {
-        goto error;
-    }
-    double *weight_buffer = PyArray_DATA(weight_arr);
-
-    // count neighbours for all inputs
-    double count = 0.0;
-    long idx = 0;
-    Point point;
-    while (iter_get_next_xyz(xyz_iter, &point.x, &point.y, &point.z)) {
-        point.weight = weight_buffer[idx];
-        count += balltree_count_radius(self->balltree, &point, radius);
-        ++idx;
-    }
-    pycount = PyFloat_FromDouble(count);
-
-error:
-    if (xyz_iter != NULL) {
-        npyiterhelper_free(xyz_iter);
-    }
-    Py_XDECREF(weight_arr);
-    Py_XDECREF(xyz_arr);
-    return pycount;
-}
-
-static PyObject *PyBallTree_count_range(
-    PyBallTree *self,
-    PyObject *args,
-    PyObject *kwargs
-) {
-    static char *kwlist[] = {"xyz", "rmin", "rmax", "weight", NULL};
-    PyObject *xyz_obj, *weight_obj = Py_None;
-    double rmin, rmax;
-    if (!PyArg_ParseTupleAndKeywords(
-            args, kwargs, "Odd|O", kwlist,
-            &xyz_obj, &rmin, &rmax, &weight_obj)
-    ) {
-        return NULL;
-    }
-
-    PyObject *pycount = NULL;  // return value
-    PyArrayObject *xyz_arr = NULL, *weight_arr = NULL;
-    NpyIterHelper *xyz_iter = NULL;
-
-    // ensure that inputs are numpy arrays of correct type and shape
-    xyz_arr = xyz_ensure_2dim_double(xyz_obj);
-    if (xyz_arr == NULL) {
-        return NULL;
-    }
-    npy_intp length = PyArray_DIM(xyz_arr, 0);
-    if (length == 0) {
-        PyErr_SetString(PyExc_ValueError, "'xyz' needs to contain at least one element");
-        goto error;
-    }
-    weight_arr = weight_matched_1dim_double(weight_obj, length);
-    if (weight_arr == NULL) {
-        goto error;
-    }
-
-    // get an iterator for input data
-    xyz_iter = npyiterhelper_new(xyz_arr);
-    if (xyz_iter == NULL) {
-        goto error;
-    }
-    double *weight_buffer = PyArray_DATA(weight_arr);
-
-    // count neighbours for all inputs
-    double count = 0.0;
-    long idx = 0;
-    Point point;
-    while (iter_get_next_xyz(xyz_iter, &point.x, &point.y, &point.z)) {
-        point.weight = weight_buffer[idx];
-        count += balltree_count_range(self->balltree, &point, rmin, rmax);
-        ++idx;
-    }
-    pycount = PyFloat_FromDouble(count);
-
-error:
-    if (xyz_iter != NULL) {
-        npyiterhelper_free(xyz_iter);
-    }
-    Py_XDECREF(weight_arr);
-    Py_XDECREF(xyz_arr);
-    return pycount;
+    return PyBallTree_accumulate_radius(
+        self,
+        balltree_count_radius,
+        xyz_obj,
+        radius,
+        weight_obj
+    );
 }
 
 static PyObject *PyBallTree_dualcount_radius(PyBallTree *self, PyObject *args) {
@@ -919,7 +834,6 @@ static PyObject *PyBallTree_dualcount_radius(PyBallTree *self, PyObject *args) {
     if (!PyArg_ParseTuple(args, "O!d", &PyBallTreeType, &other_tree, &radius)) {
         return NULL;
     }
-
     double count = balltree_dualcount_radius(
         self->balltree,
         other_tree->balltree,
@@ -928,20 +842,65 @@ static PyObject *PyBallTree_dualcount_radius(PyBallTree *self, PyObject *args) {
     return PyFloat_FromDouble(count);
 }
 
+static PyObject *PyBallTree_brute_range(
+    PyBallTree *self,
+    PyObject *args,
+    PyObject *kwargs
+) {
+    static char *kwlist[] = {"xyz", "radii", "weight", NULL};
+    PyObject *xyz_obj, *edges_obj, *weight_obj = Py_None;
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, "OO|O", kwlist,
+            &xyz_obj, &edges_obj, &weight_obj)
+    ) {
+        return NULL;
+    }
+    return PyBallTree_accumulate_range(
+        self,
+        balltree_brute_range,
+        xyz_obj,
+        edges_obj,
+        weight_obj
+    );
+}
+
+static PyObject *PyBallTree_count_range(
+    PyBallTree *self,
+    PyObject *args,
+    PyObject *kwargs
+) {
+    static char *kwlist[] = {"xyz", "radii", "weight", NULL};
+    PyObject *xyz_obj, *edges_obj, *weight_obj = Py_None;
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, "OO|O", kwlist,
+            &xyz_obj, &edges_obj, &weight_obj)
+    ) {
+        return NULL;
+    }
+    return PyBallTree_accumulate_range(
+        self,
+        balltree_count_range,
+        xyz_obj,
+        edges_obj,
+        weight_obj
+    );
+}
+
 static PyObject *PyBallTree_dualcount_range(PyBallTree *self, PyObject *args) {
     PyBallTree *other_tree;
-    double rmin, rmax;
-    if (!PyArg_ParseTuple(args, "O!dd", &PyBallTreeType, &other_tree, &rmin, &rmax)) {
+    PyObject *edges_obj;
+    if (!PyArg_ParseTuple(args, "O!O", &PyBallTreeType, &other_tree, &edges_obj)) {
         return NULL;
     }
 
-    double count = balltree_dualcount_range(
-        self->balltree,
-        other_tree->balltree,
-        rmin,
-        rmax
-    );
-    return PyFloat_FromDouble(count);
+    DistHistogram *hist = disthistogram_from_PyObject(edges_obj);
+    if (hist == NULL) {
+        return NULL;
+    }
+    balltree_dualcount_range(self->balltree, other_tree->balltree, hist);
+    PyObject *pycounts = PyObject_from_disthistogram(hist);
+    hist_free(hist);
+    return pycounts;
 }
 
 // PyBallTree definition ///////////////////////////////////////////////////////
@@ -1020,28 +979,28 @@ static PyMethodDef PyBallTree_methods[] = {
         .ml_doc = "Count pairs within a radius"
     },
     {
-        .ml_name = "brute_range",
-        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_brute_range,
-        .ml_flags = METH_VARARGS | METH_KEYWORDS,
-        .ml_doc = "Count pairs within a range"
-    },
-    {
         .ml_name = "count_radius",
         .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_radius,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
         .ml_doc = "Count pairs within a radius"
     },
     {
-        .ml_name = "count_range",
-        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_range,
-        .ml_flags = METH_VARARGS | METH_KEYWORDS,
-        .ml_doc = "Count pairs within a range"
-    },
-    {
         .ml_name = "dualcount_radius",
         .ml_meth = (PyCFunction)PyBallTree_dualcount_radius,
         .ml_flags = METH_VARARGS,
         .ml_doc = "Count pairs within a radius with the dualtree algorithm"
+    },
+    {
+        .ml_name = "brute_range",
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_brute_range,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Count pairs within a range"
+    },
+    {
+        .ml_name = "count_range",
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_range,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = "Count pairs within a range"
     },
     {
         .ml_name = "dualcount_range",
@@ -1058,7 +1017,7 @@ static PyTypeObject PyBallTreeType = {
     .tp_doc = "Python wrapper for C BallTree",
     .tp_basicsize = sizeof(PyBallTree),
     .tp_itemsize = 0,
-    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .tp_new = PyBallTree_new,
     .tp_dealloc = PyBallTree_dealloc,
     .tp_init = (initproc)PyBallTree_init,

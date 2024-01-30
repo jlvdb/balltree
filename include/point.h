@@ -1,14 +1,6 @@
 #ifndef POINT_H
 #define POINT_H
 
-#define EUCLIDEAN_DIST_SQ(p1, p2) \
-    ({ \
-        double __dx = (p1)->x - (p2)->x; \
-        double __dy = (p1)->y - (p2)->y; \
-        double __dz = (p1)->z - (p2)->z; \
-        __dx * __dx + __dy * __dy + __dz * __dz; \
-    })
-
 enum Axis {X, Y, Z};
 
 typedef struct {
@@ -27,6 +19,14 @@ typedef struct {
     Point *start;
     Point *end;
 } PointSlice;
+
+#define EUCLIDEAN_DIST_SQ(p1, p2) \
+    ({ \
+        double __dx = (p1)->x - (p2)->x; \
+        double __dy = (p1)->y - (p2)->y; \
+        double __dz = (p1)->z - (p2)->z; \
+        __dx * __dx + __dy * __dy + __dz * __dz; \
+    })
 
 // from point.c
 Point point_create(double, double, double);
