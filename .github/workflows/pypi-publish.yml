@@ -16,7 +16,6 @@ jobs:
     name: Build wheels on ${{ matrix.setup.os }} (${{ matrix.setup.build }})
     runs-on: ${{ matrix.setup.os }}
     strategy:
-      fail-fast: false
       matrix:
         setup:
           - os:    "ubuntu-latest"
@@ -42,7 +41,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: ./wheelhouse/*.whl
-          name: artifact-${{ matrix.setup.build }}
+          name: artifact-${{ matrix.setup.os }}
 
   build_sdist:
     name: Build sdist and upload to PyPI
@@ -83,9 +82,9 @@ jobs:
         run: |
           echo ls -l wheels
           ls -l wheels
-          echo ls -l wheels/artifact
-          ls -l wheels/artifact
-          cp wheels/artifact/*.whl dist
+          echo ls -l wheels/artifact-*
+          ls -l wheels/artifact-*
+          cp wheels/artifact-*/*.whl dist
           echo ls -l dist
           ls -l dist
 
