@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -27,7 +28,7 @@ BallTree *balltree_build_leafsize(const PointBuffer *buffer, int leafsize) {
 }
 
 BallTree *balltree_build_nocopy(PointBuffer *buffer, int leafsize) {
-    long size = buffer->size;
+    int64_t size = buffer->size;
     if (size < 1) {
         EMIT_ERR_MSG(ValueError, "need at least one input data point to build a tree");
         return NULL;
@@ -66,7 +67,7 @@ void balltree_free(BallTree *tree) {
     free(tree);
 }
 
-long balltree_count_nodes(const BallTree *tree) {
+int64_t balltree_count_nodes(const BallTree *tree) {
     return bnode_count_nodes(tree->root);
 }
 
@@ -89,7 +90,7 @@ void balltree_brute_range(
     DistHistogram *hist
 ) {
     Point *points = tree->data->points;
-    for (long i = 0; i < tree->data->size; ++i) {
+    for (int64_t i = 0; i < tree->data->size; ++i) {
         double dist_sq = EUCLIDEAN_DIST_SQ(point, points + i);
         // increment corresponding bin by weight
         HISTOGRAM_INSERT_DIST_SQ(hist, dist_sq, point->weight * points[i].weight);
@@ -129,7 +130,7 @@ void balltree_dualcount_range(
 }
 
 StatsVector *balltree_collect_stats(const BallTree *tree) {
-    long num_nodes = balltree_count_nodes(tree);
+    int64_t num_nodes = balltree_count_nodes(tree);
     StatsVector *vec = statvec_new_reserve(num_nodes);
     if (vec == NULL) {
         return NULL;

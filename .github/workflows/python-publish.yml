@@ -25,8 +25,8 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.9.0
         env:
-          CIBW_BUILD: "*manylinux*64"
-          CIBW_SKIP: cp36* pp* *i686
+          CIBW_BUILD: "*manylinux*"
+          CIBW_SKIP: cp36* pp*
 
       - uses: actions/upload-artifact@v3
         with:
@@ -41,8 +41,8 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.9.0
         env:
-          CIBW_BUILD: "*musllinux*64"
-          CIBW_SKIP: cp36* pp* *i686
+          CIBW_BUILD: "*musllinux*"
+          CIBW_SKIP: cp36* pp*
 
       - uses: actions/upload-artifact@v3
         with:
@@ -57,7 +57,7 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.9.0
         env:
-          CIBW_BUILD: "*macosx*64"
+          CIBW_BUILD: "*macosx*"
           CIBW_SKIP: cp36* pp*
 
       - uses: actions/upload-artifact@v3
@@ -73,8 +73,8 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.9.0
         env:
-          CIBW_BUILD: "*win*64"
-          CIBW_SKIP: cp36* pp* *win32
+          CIBW_BUILD: "*win*"
+          CIBW_SKIP: cp36* pp*
 
       - uses: actions/upload-artifact@v3
         with:

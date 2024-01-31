@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #include "point.h"
@@ -83,7 +84,7 @@ void bnode_count_range(
 
     // case: node may entirely fall into one bin
     double rmin = -INFINITY;  // ensure 0.0 is included at first iteration
-    for (long i = 0; i < hist-> size; ++i) {
+    for (int64_t i = 0; i < hist-> size; ++i) {
         double rmax = hist->dist[i];
         if (rmin + node_radius < distance && distance <= rmax - node_radius) {
             hist->sum_weight[i] += point->weight * node->sum_weight;
@@ -168,7 +169,7 @@ void bnode_dualcount_range(
 
     // case: nodes may entirely fall into one bin
     double rmin = -INFINITY;  // ensure 0.0 is included at first iteration
-    for (long i = 0; i < hist-> size; ++i) {
+    for (int64_t i = 0; i < hist-> size; ++i) {
         double rmax = hist->dist[i];
         if (rmin + sum_node_radii < distance && distance <= rmax - sum_node_radii) {
             hist->sum_weight[i] += node1->sum_weight * node2->sum_weight;

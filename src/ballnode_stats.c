@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "ballnode.h"
@@ -7,7 +8,7 @@ StatsVector *statvec_new() {
     return statvec_new_reserve(32L);
 }
 
-StatsVector *statvec_new_reserve(long reserve_capacity) {
+StatsVector *statvec_new_reserve(int64_t reserve_capacity) {
     if (reserve_capacity < 1) {
         EMIT_ERR_MSG(MemoryError, "StatsVector capacity must be positive");
         return NULL;
@@ -37,7 +38,7 @@ void statvec_free(StatsVector *vec) {
     free(vec);
 }
 
-int statvec_resize(StatsVector *vec, long capacity) {
+int statvec_resize(StatsVector *vec, int64_t capacity) {
     if (capacity < 1) {
         EMIT_ERR_MSG(ValueError, "StatsVector capacity must be positive");
         return BTR_FAILED;
@@ -95,8 +96,8 @@ int bnode_collect_stats(const BallNode *node, StatsVector *vec, int depth) {
     return BTR_SUCCESS;
 }
 
-long bnode_count_nodes(const BallNode *node) {
-    long count = 1;
+int64_t bnode_count_nodes(const BallNode *node) {
+    int64_t count = 1;
     if (!BALLNODE_IS_LEAF(node)) {
         count += bnode_count_nodes(node->childs.left);
         count += bnode_count_nodes(node->childs.right);

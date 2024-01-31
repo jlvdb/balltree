@@ -1,6 +1,8 @@
 #ifndef POINT_H
 #define POINT_H
 
+#include <stdint.h>
+
 enum Axis {X, Y, Z};
 
 typedef struct {
@@ -12,7 +14,7 @@ typedef struct {
 
 typedef struct {
     Point *points;
-    long size;
+    int64_t size;
 } PointBuffer;
 
 typedef struct {
@@ -35,16 +37,16 @@ double point_dist(const Point *, const Point *);
 double point_dist_sq(const Point *, const Point *);
 
 // from pointbuffers.c
-PointBuffer *ptbuf_new(long);
-PointBuffer *ptbuf_from_buffers(long, double *, double *, double *);
-PointBuffer *ptbuf_from_buffers_weighted(long, double *, double *, double *, double *);
+PointBuffer *ptbuf_new(int64_t);
+PointBuffer *ptbuf_from_buffers(int64_t, double *, double *, double *);
+PointBuffer *ptbuf_from_buffers_weighted(int64_t, double *, double *, double *, double *);
 void ptbuf_free(PointBuffer *);
-int ptbuf_resize(PointBuffer *, long);
+int ptbuf_resize(PointBuffer *, int64_t);
 PointBuffer *ptbuf_copy(const PointBuffer *);
-PointBuffer *ptbuf_gen_random(double, double, long);
+PointBuffer *ptbuf_gen_random(double, double, int64_t);
 
 PointSlice *ptslc_from_buffer(const PointBuffer *);
-long ptslc_get_size(const PointSlice *);
+int64_t ptslc_get_size(const PointSlice *);
 double ptslc_sumw_in_radius_sq(const PointSlice *, const Point *, double);
 double ptslc_sumw_in_range_sq(const PointSlice *, const Point *, double, double);
 double ptslc_dualsumw_in_radius_sq(const PointSlice *, const PointSlice *, double);

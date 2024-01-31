@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,7 +6,7 @@
 #include "histogram.h"
 #include "balltree_macros.h"
 
-DistHistogram *hist_new(long size, double *dist_edges) {
+DistHistogram *hist_new(int64_t size, double *dist_edges) {
     if (size < 1) {
         EMIT_ERR_MSG(ValueError, "DistHistogram requires at least 1 edges");
         return NULL;
@@ -48,7 +49,7 @@ DistHistogram *hist_new(long size, double *dist_edges) {
 
     // initialise dist/_sq buffers
     double edge = 0.0;
-    for (long i = 0; i < size; ++i) {
+    for (int64_t i = 0; i < size; ++i) {
         edge = dist_edges[i];
         dist[i] = edge;
         dist_sq[i] = edge * edge;
@@ -71,7 +72,7 @@ void hist_free(DistHistogram *hist) {
     free(hist);
 }
 
-long hist_insert(DistHistogram *hist, double distance, double weight) {
+int64_t hist_insert(DistHistogram *hist, double distance, double weight) {
     double dist_sq = distance * distance;
     return HISTOGRAM_INSERT_DIST_SQ(hist, dist_sq, weight);
 }

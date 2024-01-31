@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,7 +8,7 @@
 
 static inline double rand_uniform(double low, double high);
 
-PointBuffer *ptbuf_new(long size) {
+PointBuffer *ptbuf_new(int64_t size) {
     if (size < 1) {
         EMIT_ERR_MSG(ValueError, "PointBuffer size must be positive");
         return NULL;
@@ -33,7 +34,7 @@ PointBuffer *ptbuf_new(long size) {
 }
 
 PointBuffer *ptbuf_from_buffers(
-    long size,
+    int64_t size,
     double *x_vals,
     double *y_vals,
     double *z_vals
@@ -43,14 +44,14 @@ PointBuffer *ptbuf_from_buffers(
         return NULL;
     }
     Point *points = buffer->points;
-    for (long i = 0; i < size; ++i) {
+    for (int64_t i = 0; i < size; ++i) {
         points[i] = point_create(x_vals[i], y_vals[i], z_vals[i]);
     }
     return buffer;
 }
 
 PointBuffer *ptbuf_from_buffers_weighted(
-    long size,
+    int64_t size,
     double *x_vals,
     double *y_vals,
     double *z_vals,
@@ -61,7 +62,7 @@ PointBuffer *ptbuf_from_buffers_weighted(
         return NULL;
     }
     Point *points = buffer->points;
-    for (long i = 0; i < size; ++i) {
+    for (int64_t i = 0; i < size; ++i) {
         points[i].weight = weights[i];
     }
     return buffer;
@@ -74,7 +75,7 @@ void ptbuf_free(PointBuffer *buffer) {
     free(buffer);
 }
 
-int ptbuf_resize(PointBuffer *buffer, long size) {
+int ptbuf_resize(PointBuffer *buffer, int64_t size) {
     if (size < 1) {
         EMIT_ERR_MSG(ValueError, "PointBuffer size must be positive");
         return BTR_FAILED;
@@ -108,13 +109,13 @@ static inline double rand_uniform(double low, double high) {
     return rand_uniform_normalised * (high - low) + low;
 }
 
-PointBuffer *ptbuf_gen_random(double low, double high, long num_points) {
+PointBuffer *ptbuf_gen_random(double low, double high, int64_t num_points) {
     PointBuffer *buffer = ptbuf_new(num_points);
     if (buffer == NULL) {
         return NULL;
     }
 
-    for (long i = 0; i < num_points; ++i) {
+    for (int64_t i = 0; i < num_points; ++i) {
         double x = rand_uniform(low, high);
         double y = rand_uniform(low, high);
         double z = rand_uniform(low, high);
@@ -135,7 +136,7 @@ PointSlice *ptslc_from_buffer(const PointBuffer *buffer) {
     return slice;
 }
 
-long ptslc_get_size(const PointSlice *slice) {
+int64_t ptslc_get_size(const PointSlice *slice) {
     return slice->end - slice->start;
 }
 

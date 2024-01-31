@@ -2,6 +2,7 @@
 #include <Python.h>
 #include <numpy/arrayobject.h>
 
+#include <stdint.h>
 #include <stdio.h>
 
 #include "point.h"
@@ -36,7 +37,7 @@ typedef struct {
 } NpyIterHelper;
 
 typedef struct {
-    long size;
+    int64_t size;
     PyArrayObject *xyz_arr;
     NpyIterHelper *xyz_iter;
     PyArrayObject *weight_arr;
@@ -389,7 +390,7 @@ static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj
         inputiterdata_free(data);
         return NULL;
     }
-    long idx = 0;
+    int64_t idx = 0;
     double x, y, z;
     while (iter_get_next_xyz(data->xyz_iter, &x, &y, &z)) {
         buffer->points[idx] = (Point){x, y, z, data->weight_buffer[idx]};
@@ -444,7 +445,7 @@ static DistHistogram *disthistogram_from_PyObject(PyObject *edges_obj) {
     if (edges_arr == NULL) {
         return NULL;
     }
-    long num_edges = (long)PyArray_DIM(edges_arr, 0);
+    int64_t num_edges = (int64_t)PyArray_DIM(edges_arr, 0);
     double *edges_buffer = PyArray_DATA(edges_arr);
     DistHistogram *hist = hist_new(num_edges, edges_buffer);
     Py_DECREF(edges_arr);
@@ -458,7 +459,7 @@ static PyObject *PyObject_from_disthistogram(DistHistogram *hist) {
         return NULL;
     }
     double *count_buffer = PyArray_DATA(pycount);
-    for (long i = 0; i < hist->size; ++i) {
+    for (int64_t i = 0; i < hist->size; ++i) {
         count_buffer[i] = hist->sum_weight[i];
     }
     return pycount;
@@ -515,7 +516,7 @@ static PyObject *PyBallTree_accumulate_radius(
     }
     // count neighbours for all inputs
     double count = 0.0;
-    long idx = 0;
+    int64_t idx = 0;
     Point point;
     while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
         point.weight = data->weight_buffer[idx];
@@ -543,7 +544,7 @@ static PyObject *PyBallTree_accumulate_range(
         return NULL;
     }
     // count neighbours for all inputs
-    long idx = 0;
+    int64_t idx = 0;
     Point point;
     while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
         point.weight = data->weight_buffer[idx];

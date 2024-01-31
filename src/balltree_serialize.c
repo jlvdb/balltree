@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -7,7 +8,7 @@
 #include "balltree_macros.h"
 
 static int ptbuf_write(const PointBuffer *buffer, FILE *file);
-static PointBuffer *ptbuf_read(long n_items, FILE *file);
+static PointBuffer *ptbuf_read(int64_t n_items, FILE *file);
 
 typedef struct {
     BallNode *nodes;
@@ -15,14 +16,14 @@ typedef struct {
     size_t size;
 } BNodeBuffer;
 
-static BNodeBuffer *bnodebuffer_new(long size);
+static BNodeBuffer *bnodebuffer_new(int64_t size);
 static void bnodebuffer_free(BNodeBuffer *buffer);
 static size_t bnodebuffer_get_next_free(BNodeBuffer *buffer);
 static int bnodebuffer_write(const BNodeBuffer *buffer, FILE *file);
-static BNodeBuffer *bnodebuffer_read(long n_items, FILE *file);
+static BNodeBuffer *bnodebuffer_read(int64_t n_items, FILE *file);
 
 typedef struct {
-    long n_items;
+    int64_t n_items;
     int itemsize;
 } SectionHeader;
 
@@ -51,7 +52,7 @@ static int ptbuf_write(const PointBuffer *buffer, FILE *file) {
     return BTR_SUCCESS;
 }
 
-static PointBuffer *ptbuf_read(long n_items, FILE *file) {
+static PointBuffer *ptbuf_read(int64_t n_items, FILE *file) {
     PointBuffer *buffer = ptbuf_new(n_items);
     if (buffer == NULL) {
         return NULL;
@@ -60,13 +61,13 @@ static PointBuffer *ptbuf_read(long n_items, FILE *file) {
     size_t n_read = fread(buffer->points, sizeof(Point), n_items, file);
     if (n_read != (size_t)n_items) {
         ptbuf_free(buffer);
-        EMIT_ERR_MSG(IOError, "failed to read %ld data points", n_items);
+        EMIT_ERR_MSG(IOError, "failed to read %lld data points", n_items);
         return NULL;
     }
     return buffer;
 }
 
-static BNodeBuffer *bnodebuffer_new(long size) {
+static BNodeBuffer *bnodebuffer_new(int64_t size) {
     BNodeBuffer *nodebuffer = malloc(sizeof(BNodeBuffer));
     if (nodebuffer == NULL) {
         EMIT_ERR_MSG(MemoryError, "failed to allocate BNodeBuffer");
@@ -105,7 +106,7 @@ static int bnodebuffer_write(const BNodeBuffer *buffer, FILE *file) {
     return BTR_SUCCESS;
 }
 
-static BNodeBuffer *bnodebuffer_read(long n_items, FILE *file) {
+static BNodeBuffer *bnodebuffer_read(int64_t n_items, FILE *file) {
     BNodeBuffer *buffer = bnodebuffer_new(n_items);
     if (buffer == NULL) {
         return NULL;
@@ -113,7 +114,7 @@ static BNodeBuffer *bnodebuffer_read(long n_items, FILE *file) {
 
     size_t n_read = fread(buffer->nodes, sizeof(BallNode), n_items, file);
     if (n_read != (size_t)n_items) {
-        EMIT_ERR_MSG(IOError, "failed to read %ld nodes", n_items);
+        EMIT_ERR_MSG(IOError, "failed to read %lld nodes", n_items);
         bnodebuffer_free(buffer);
         return NULL;
     }

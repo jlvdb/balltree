@@ -1,6 +1,8 @@
 #ifndef BALLNODE_H
 #define BALLNODE_H
 
+#include <stdint.h>
+
 #include "point.h"
 #include "histogram.h"
 
@@ -27,16 +29,16 @@ struct BallNode {
         PointSlice data;  // is_leaf == 1
     };
     struct {
-        unsigned long is_leaf : 1;
-        unsigned long num_points : 63;
+        uint64_t is_leaf : 1;
+        uint64_t num_points : 63;
     };
     double sum_weight;
 };
 typedef struct BallNode BallNode;
 
 typedef struct {
-    long depth;
-    long num_points;
+    int64_t depth;
+    int64_t num_points;
     double sum_weight;
     double x, y, z;
     double radius;
@@ -44,8 +46,8 @@ typedef struct {
 
 typedef struct {
     NodeStats *stats;
-    long capacity;
-    long size;
+    int64_t capacity;
+    int64_t size;
 } StatsVector;
 
 // from ballnode.c
@@ -61,11 +63,11 @@ double bnode_dualcount_radius(const BallNode *, const BallNode *, double);
 void bnode_dualcount_range(const BallNode *, const BallNode *, DistHistogram *);
 
 // from ballnode_stats.c
-StatsVector *statvec_new_reserve(long);
+StatsVector *statvec_new_reserve(int64_t);
 void statvec_free(StatsVector *);
-int statvec_resize(StatsVector *, long);
+int statvec_resize(StatsVector *, int64_t);
 int statvec_append(StatsVector *, const NodeStats *);
 int bnode_collect_stats(const BallNode *, StatsVector *, int);
-long bnode_count_nodes(const BallNode *);
+int64_t bnode_count_nodes(const BallNode *);
 
 #endif /* BALLNODE_H */

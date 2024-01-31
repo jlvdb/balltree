@@ -1,6 +1,8 @@
 #ifndef BALLTREE_H
 #define BALLTREE_H
 
+#include <stdint.h>
+
 #include "point.h"
 #include "histogram.h"
 #include "ballnode.h"
@@ -27,7 +29,7 @@ void balltree_count_range(const BallTree *, const Point *, DistHistogram *);
 double balltree_dualcount_radius(const BallTree *, const BallTree *, double);
 void balltree_dualcount_range(const BallTree *, const BallTree *, DistHistogram *);
 
-long balltree_count_nodes(const BallTree *);
+int64_t balltree_count_nodes(const BallTree *);
 StatsVector *balltree_collect_stats(const BallTree *);
 
 // from balltree_serialize.c

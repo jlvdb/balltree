@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -141,7 +142,7 @@ static Point *ptslc_partition(PointSlice *slice, Point *pivot, enum Axis axis) {
 
 static Point *ptslc_quickselect(PointSlice *slice, Point *partition, enum Axis axis) {
     if (slice->start < slice->end) {
-        long pivot_offset = (slice->end - slice->start) / 2;
+        int64_t pivot_offset = (slice->end - slice->start) / 2;
         Point *pivot = slice->start + pivot_offset;
         pivot = ptslc_partition(slice, pivot, axis);
 
@@ -170,7 +171,7 @@ static Point *ptslc_quickselect(PointSlice *slice, Point *partition, enum Axis a
 
 static Point *ptslc_partition_maxspread_axis(PointSlice *slice) {
     enum Axis split_axis = ptslc_get_maxspread_axis(slice);
-    long median_offset = (slice->end - slice->start) / 2;
+    int64_t median_offset = (slice->end - slice->start) / 2;
     Point *median = slice->start + median_offset;
     median = ptslc_quickselect(slice, median, split_axis);
     if (median == NULL) {
@@ -180,7 +181,7 @@ static Point *ptslc_partition_maxspread_axis(PointSlice *slice) {
 }
 
 BallNode *bnode_build(PointSlice *slice, int leafsize) {
-    long num_points = ptslc_get_size(slice);
+    int64_t num_points = ptslc_get_size(slice);
 
     BallNode *node = calloc(1, sizeof(BallNode));
     if (node == NULL) {
