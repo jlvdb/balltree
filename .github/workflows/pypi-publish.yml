@@ -1,9 +1,6 @@
 name: PyPI publish
 
 on:
-  push:
-    branches:
-      - main
   release:
     types: 
       - published
@@ -44,7 +41,6 @@ jobs:
           path: ./wheelhouse/*.whl
 
   build_sdist:
-    if: false
     name: Build sdist and upload to PyPI
     needs: build_wheels
     runs-on: ubuntu-latest
