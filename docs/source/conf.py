@@ -118,7 +118,7 @@ with open("../../README.rst") as f:
     content = f.read()
     readme_text = "".join(content.split("|", 2)[2])  # drop header
 with open("index.rst", "w") as f:
-    f.write(index_text.replace("%README%", readme_text).replace("|", toc))
+    f.write(index_text.replace("%README%", readme_text).replace(".. toc", toc))
 
 # generate the BallTree documentation
 with open("api/balltree.BallTree.rst", "w") as f:

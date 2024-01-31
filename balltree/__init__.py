@@ -1,4 +1,4 @@
-__version__ = "0.4"
+__version__ = "1.0"
 
 from .angulartree import AngularTree
 from .balltree import BallTree, default_leafsize as _df

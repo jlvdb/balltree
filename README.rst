@@ -1,5 +1,5 @@
 .. image:: https://raw.githubusercontent.com/jlvdb/balltree/main/docs/source/_static/logo.png
-    :width: 800
+    :width: 750
     :alt: balltree
 
 |
@@ -22,7 +22,7 @@ the query routines are geared towards range queries, i.e. counting pairs with a
 given (range of) separations. Fixed number nearest neighbour search is currently
 not implemented.
 
-|
+.. toc
 
 Installation
 ------------
