@@ -13,9 +13,10 @@ permissions:
 
 jobs:
   build_wheels:
-    name: Build wheels on ${{ matrix.setup.os }}
+    name: Build wheels on ${{ matrix.setup.os }} (${{ matrix.setup.build }})
     runs-on: ${{ matrix.setup.os }}
     strategy:
+      fail-fast: false
       matrix:
         setup:
           - os:    "ubuntu-latest"
