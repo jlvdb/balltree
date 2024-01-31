@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.15
+        uses: pypa/cibuildwheel@v2.16
         env:
           CIBW_BUILD: ${{ matrix.setup.build }}
           CIBW_SKIP: cp36* pp*
