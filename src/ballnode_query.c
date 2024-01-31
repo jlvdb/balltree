@@ -22,7 +22,7 @@ static inline void ptslc_sumw_in_hist_sq(
         // increment corresponding bin by weight
         // TODO: improvements in ptslc_dualsumw_in_hist_sq allow to drop the
         // multiplication with the ref_point weight
-        HISTOGRAM_INSERT_DIST_SQ(hist, dist_sq, point->weight * ref_point->weight);
+        hist_insert_dist_sq(hist, dist_sq, point->weight * ref_point->weight);
     }
 }
 

@@ -23,12 +23,9 @@ typedef struct {
 } PointSlice;
 
 #define EUCLIDEAN_DIST_SQ(p1, p2) \
-    ({ \
-        double __dx = (p1)->x - (p2)->x; \
-        double __dy = (p1)->y - (p2)->y; \
-        double __dz = (p1)->z - (p2)->z; \
-        __dx * __dx + __dy * __dy + __dz * __dz; \
-    })
+    (((p1)->x - (p2)->x) * ((p1)->x - (p2)->x) + \
+     ((p1)->y - (p2)->y) * ((p1)->y - (p2)->y) + \
+     ((p1)->z - (p2)->z) * ((p1)->z - (p2)->z))
 
 // from point.c
 Point point_create(double, double, double);

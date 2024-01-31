@@ -72,7 +72,15 @@ void hist_free(DistHistogram *hist) {
     free(hist);
 }
 
-int64_t hist_insert(DistHistogram *hist, double distance, double weight) {
-    double dist_sq = distance * distance;
-    return HISTOGRAM_INSERT_DIST_SQ(hist, dist_sq, weight);
+int64_t hist_insert_dist_sq(DistHistogram *hist, double dist_sq, double weight) {
+    int64_t bin_idx = -1;
+    if (dist_sq <= hist->dist_sq_max) {
+        for (bin_idx = 0; bin_idx <= hist->size; ++bin_idx) {
+            if (dist_sq <= hist->dist_sq[bin_idx]) {
+                hist->sum_weight[bin_idx] += weight;
+                break;
+            }
+        }
+    }
+    return bin_idx;
 }
