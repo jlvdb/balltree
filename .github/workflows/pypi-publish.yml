@@ -18,7 +18,7 @@ jobs:
           - os:    "ubuntu-latest"
             build: "manylinux"
           - os:    "ubuntu-latest"
-            build: "*musllinux"
+            build: "musllinux"
           - os:    "macos-latest"
             build: "macosx"
           - os:    "windows-latest"
