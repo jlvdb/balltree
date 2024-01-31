@@ -18,10 +18,14 @@ jobs:
     strategy:
       matrix:
         setup:
-          - { os: ubuntu-latest,  build:, "*manylinux*" }
-          - { os: ubuntu-latest,  build:, "*musllinux*" }
-          - { os: macos-latest,   build:, "*macosx*" }
-          - { os: windows-latest, build:, "*win*" }
+          - os:    "ubuntu-latest"
+            build: "*manylinux*"
+          - os:    "ubuntu-latest"
+            build: "*musllinux*"
+          - os:    "macos-latest"
+            build: "*macosx*"
+          - os:    "windows-latest"
+            build: "*win*"
 
     steps:
       - name: Checkout code
