@@ -8,6 +8,21 @@
 #include "balltree.h"
 #include "balltree_macros.h"
 
+PyDoc_STRVAR(
+    // .. py:class::
+    balltree_doc,
+    "BallTree(xyz: ArrayLike, weight: ArrayLike | None = None, leafsize: int | None = None)\n\n"
+    "A wrapper for the `C` implementation of BallTree.\n\n"
+    "The tree is implemented for 3-dim coordinates and an Euclidean distance\n"
+    "metric. It provides different alorigthms to count neighbours within a\n"
+    "single or multiple query points.\n\n"
+    "The data point(s) ``xyz`` can be a numpy array of shape (3,) or (N, 3),\n"
+    "or an equivalent python object. The optional ``weights`` can be a float\n"
+    "or a 1-dim sequence of matching length, the optional ``leafsize``\n"
+    "determines when the tree query algorithms switch from traversal to brute\n"
+    "force."
+);
+
 typedef double (*count_radius_func)(const BallTree *, const Point *, double);
 typedef void (*count_range_func)(const BallTree *, const Point *, DistHistogram *);
 
@@ -62,7 +77,7 @@ static PyObject *PyBallTree_from_random(PyTypeObject *cls, PyObject *args, PyObj
 static PyObject *PyBallTree_from_file(PyTypeObject *cls, PyObject *args);
 // PyBallTree: property implementation
 static PyObject *PyBallTree_get_data(PyBallTree *self, void *closure);
-static PyObject *PyBallTree_get_num_data(PyBallTree *self, void *closure);
+static PyObject *PyBallTree_get_num_points(PyBallTree *self, void *closure);
 static PyObject *PyBallTree_get_leafsize(PyBallTree *self, void *closure);
 static PyObject *PyBallTree_get_sum_weight(PyBallTree *self, void *closure);
 static PyObject *PyBallTree_get_center(PyBallTree *self, void *closure);
@@ -590,11 +605,15 @@ static int PyBallTree_init(
 }
 
 PyDoc_STRVAR(
-    from_random__doc__,
-    "from_random(low, high, size, leafsize=None)\n"
-    "--\n\n"  // Required + Python convention
-    "Build a ball tree from randomly generated points.\n"
-    "..."
+    // .. py:method::
+    //     :classmethod:
+    from_random_doc,
+    "from_random(cls, low: float, high: float, size: int, leafsize: int | None = None) -> BallTree\n"
+    "--\n\n"
+    "Build a new BallTree instance from randomly generated points.\n\n"
+    "The (x, y, z) coordinates are generated uniformly in the interval\n"
+    "[`low`, `high`), `size` controlls the number of points generated. The\n"
+    "optional `leafsize` sets the leaf size of the tree."
 );
 
 static PyObject *PyBallTree_from_random(
@@ -636,6 +655,15 @@ static PyObject *PyBallTree_from_random(
     return (PyObject *)self;
 }
 
+PyDoc_STRVAR(
+    // .. py:method::
+    //     :classmethod:
+    from_file_doc,
+    "from_file(cls, path: str) -> BallTree\n"
+    "--\n\n"
+    "Load back a class instance from a file created by the ``to_file()`` method."
+);
+
 static PyObject *PyBallTree_from_file(PyTypeObject *type, PyObject *args) {
     PyObject *py_string;
     if (!PyArg_ParseTuple(args, "O!", &PyUnicode_Type, &py_string)) {
@@ -662,6 +690,14 @@ static PyObject *PyBallTree_from_file(PyTypeObject *type, PyObject *args) {
 
 // PyBallTree: property implementations ////////////////////////////////////////
 
+PyDoc_STRVAR(
+    // .. py:property:: data
+    //    :type: NDArray
+    get_data_doc,
+    "Get a view of the data points stored in the tree.\n\n"
+    "Note that the points are reordered when the tree is constructed."
+);
+
 static PyObject *PyBallTree_get_data(PyBallTree *self, void *closure) {
     PyObject *view = ptbuf_get_numpy_view(self->balltree->data);
     if (view == NULL) {
@@ -678,17 +714,45 @@ static PyObject *PyBallTree_get_data(PyBallTree *self, void *closure) {
     return view;
 }
 
-static PyObject *PyBallTree_get_num_data(PyBallTree *self, void *closure) {
+PyDoc_STRVAR(
+    // .. py:attribute:: num_points
+    //    :type: int
+    get_num_points_doc,
+    "Get the number of data points stored in the tree."
+);
+
+static PyObject *PyBallTree_get_num_points(PyBallTree *self, void *closure) {
     return PyLong_FromLong(self->balltree->data->size);
 }
+
+PyDoc_STRVAR(
+    // .. py:attribute:: leafsize
+    //    :type: int
+    get_leafsize_doc,
+    "Get the leaf size of the tree."
+);
 
 static PyObject *PyBallTree_get_leafsize(PyBallTree *self, void *closure) {
     return PyLong_FromLong(self->balltree->leafsize);
 }
 
+PyDoc_STRVAR(
+    // .. py:attribute:: sum_weight
+    //    :type: float
+    get_sum_weight_doc,
+    "Get the sum over the data point weights stored in the tree."
+);
+
 static PyObject *PyBallTree_get_sum_weight(PyBallTree *self, void *closure) {
     return PyFloat_FromDouble(self->balltree->root->sum_weight);
 }
+
+PyDoc_STRVAR(
+    // .. py:attribute:: center
+    //    :type: tuple(float, float, float)
+    get_center_doc,
+    "Get the coordinates of the root node of the tree."
+);
 
 static PyObject *PyBallTree_get_center(PyBallTree *self, void *closure) {
     PyObject *tuple = NULL;
@@ -704,6 +768,13 @@ static PyObject *PyBallTree_get_center(PyBallTree *self, void *closure) {
     Py_XDECREF(z);
     return tuple;
 }
+
+PyDoc_STRVAR(
+    // .. py:attribute:: radius
+    //    :type: float
+    get_radius_doc,
+    "Get the radius of the root node of the tree."
+);
 
 static PyObject *PyBallTree_get_radius(PyBallTree *self, void *closure) {
     return PyFloat_FromDouble(self->balltree->root->ball.radius);
@@ -721,7 +792,7 @@ static PyObject *PyBallTree_str(PyObject *self) {
     int n_bytes = snprintf(
         buffer,
         sizeof(buffer),
-        "BallTree(num_data=%ld, radius=%lf, center=(%lf, %lf, %lf))",
+        "BallTree(num_points=%ld, radius=%lf, center=(%lf, %lf, %lf))",
         tree->data->size,
         node->ball.radius,
         node->ball.x,
@@ -743,11 +814,11 @@ static PyObject *PyBallTree_str(PyObject *self) {
 }
 
 PyDoc_STRVAR(
-    to_file__doc__,
-    "to_file(path)\n"
-    "--\n\n"  // Required + Python convention
-    "Serialise the tree to a binary file.\n"
-    "..."
+    // .. py:method::
+    to_file_doc,
+    "to_file(self, path: str) -> None\n"
+    "--\n\n"
+    "Store a representation of the tree instance in a binary file."
 );
 
 static PyObject *PyBallTree_to_file(PyBallTree *self, PyObject *args) {
@@ -766,10 +837,28 @@ static PyObject *PyBallTree_to_file(PyBallTree *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(
+    // .. py:method::
+    count_nodes_doc,
+    "count_nodes(self) -> int\n"
+    "--\n\n"
+    "Get a count of all nodes of the tree, including the root node."
+);
+
 static PyObject *PyBallTree_count_nodes(PyBallTree *self) {
     int count = balltree_count_nodes(self->balltree);
     return PyLong_FromLong(count);
 }
+
+PyDoc_STRVAR(
+    // .. py:method::
+    get_node_data_doc,
+    "get_node_data(self) -> NDArray\n"
+    "--\n\n"
+    "Collect the meta data of all tree nodes in a numpy array.\n\n"
+    "The array fields record `depth` (starting from the root node),\n"
+    "`num_points`, `sum_weight`, `x`, `y`, `z` (node center) and node `radius`."
+);
 
 static PyObject *PyBallTree_get_node_data(PyBallTree *self) {
     StatsVector *vec = balltree_collect_stats(self->balltree);
@@ -781,6 +870,17 @@ static PyObject *PyBallTree_get_node_data(PyBallTree *self) {
     statvec_free(vec);
     return array;
 }
+
+PyDoc_STRVAR(
+    // .. py:method::
+    brute_radius_doc,
+    "brute_radius(self, xyz: ArrayLike, radius: float, weight: ArrayLike | None = None) -> float\n"
+    "--\n\n"
+    "Count neighbours within a given radius using brute force.\n\n"
+    "The query point(s) ``xyz`` can be a numpy array of shape (3,) or (N, 3),\n"
+    "or an equivalent python object. The optional ``weights`` can be a float\n"
+    "or a 1-dim sequence of matching length."
+);
 
 static PyObject *PyBallTree_brute_radius(
     PyBallTree *self,
@@ -805,6 +905,17 @@ static PyObject *PyBallTree_brute_radius(
     );
 }
 
+PyDoc_STRVAR(
+    // .. py:method::
+    count_radius_doc,
+    "count_radius(self, xyz: ArrayLike, radius: float, weight: ArrayLike | None = None) -> float\n"
+    "--\n\n"
+    "Count neighbours within a given radius using tree traversal.\n\n"
+    "The query point(s) ``xyz`` can be a numpy array of shape (3,) or (N, 3),\n"
+    "or an equivalent python object. The optional ``weights`` can be a float\n"
+    "or a 1-dim sequence of matching length."
+);
+
 static PyObject *PyBallTree_count_radius(
     PyBallTree *self,
     PyObject *args,
@@ -828,6 +939,16 @@ static PyObject *PyBallTree_count_radius(
     );
 }
 
+PyDoc_STRVAR(
+    // .. py:method::
+    dualcount_radius_doc,
+    "dualcount_radius(self, tree: BallTree, radius: float) -> NDArray\n"
+    "--\n\n"
+    "Count all pairs within a given radius from points in another tree.\n\n"
+    "The pairs between the two trees are computed with the efficient dualtree\n"
+    "algorithm."
+);
+
 static PyObject *PyBallTree_dualcount_radius(PyBallTree *self, PyObject *args) {
     PyBallTree *other_tree;
     double radius;
@@ -841,6 +962,21 @@ static PyObject *PyBallTree_dualcount_radius(PyBallTree *self, PyObject *args) {
     );
     return PyFloat_FromDouble(count);
 }
+
+PyDoc_STRVAR(
+    // .. py:method::
+    brute_range_doc,
+    "brute_range(self, xyz: ArrayLike, radii: ArrayLike, weight: ArrayLike | None = None) -> NDArray\n"
+    "--\n\n"
+    "Count neighbours within a sequence of radii using brute force.\n\n"
+    "The query point(s) ``xyz`` can be a numpy array of shape (3,) or (N, 3),\n"
+    "or an equivalent python object. The ``radii`` must either be a float or\n"
+    "monotonic sequence. The optional ``weights`` can be a float or a 1-dim\n"
+    "sequence of matching length.\n\n"
+    "Returns an array of counts. The first element contains the count of all\n"
+    "neighbours ``0 <= r <= r_1``, the following values contain the\n"
+    "incremental counts ``r_i-1 <= r <= r_i``."
+);
 
 static PyObject *PyBallTree_brute_range(
     PyBallTree *self,
@@ -864,6 +1000,21 @@ static PyObject *PyBallTree_brute_range(
     );
 }
 
+PyDoc_STRVAR(
+    // .. py:method::
+    count_range_doc,
+    "count_range(self, xyz: ArrayLike, radii: ArrayLike, weight: ArrayLike | None = None) -> NDArray\n"
+    "--\n\n"
+    "Count neighbours within a sequence of radii using tree traversal.\n\n"
+    "The query point(s) ``xyz`` can be a numpy array of shape (3,) or (N, 3),\n"
+    "or an equivalent python object. The ``radii`` must either be a float or\n"
+    "monotonic sequence. The optional ``weights`` can be a float or a 1-dim\n"
+    "sequence of matching length.\n\n"
+    "Returns an array of counts. The first element contains the count of all\n"
+    "neighbours ``0 <= r <= r_1``, the following values contain the\n"
+    "incremental counts ``r_i-1 <= r <= r_i``."
+);
+
 static PyObject *PyBallTree_count_range(
     PyBallTree *self,
     PyObject *args,
@@ -885,6 +1036,20 @@ static PyObject *PyBallTree_count_range(
         weight_obj
     );
 }
+
+PyDoc_STRVAR(
+    // .. py:method::
+    dualcount_range_doc,
+    "dualcount_range(self, other: BallTree, radii: ArrayLike) -> NDArray\n"
+    "--\n\n"
+    "Count all pairs within a sequence of radii from points in another tree.\n\n"
+    "The pairs between the two trees are computed with the efficient dualtree\n"
+    "algorithm. The ``radii`` must either be a float or monotonic sequence.\n"
+    "The optional ``weights`` can be a float or a 1-dim.\n\n"
+    "Returns an array of counts. The first element contains the count of all\n"
+    "neighbours ``0 <= r <= r_1``, the following values contain the\n"
+    "incremental counts ``r_i-1 <= r <= r_i``."
+);
 
 static PyObject *PyBallTree_dualcount_range(PyBallTree *self, PyObject *args) {
     PyBallTree *other_tree;
@@ -909,32 +1074,32 @@ static PyGetSetDef PyBallTree_getset[] = {
     {
         .name = "data",
         .get = (getter)PyBallTree_get_data,
-        .doc = "get a view of the underlying data",
+        .doc = get_data_doc,
     },
     {
-        .name = "num_data",
-        .get = (getter)PyBallTree_get_num_data,
-        .doc = "get the number of data points stored in the tree",
+        .name = "num_points",
+        .get = (getter)PyBallTree_get_num_points,
+        .doc = get_num_points_doc,
     },
     {
         .name = "leafsize",
         .get = (getter)PyBallTree_get_leafsize,
-        .doc = "get the leafsize of the tree",
+        .doc = get_leafsize_doc,
     },
     {
         .name = "sum_weight",
         .get = (getter)PyBallTree_get_sum_weight,
-        .doc = "get the sum of points weights of the tree",
+        .doc = get_sum_weight_doc,
     },
     {
         .name = "center",
         .get = (getter)PyBallTree_get_center,
-        .doc = "get the center point associated with the root node",
+        .doc = get_center_doc,
     },
     {
         .name = "radius",
         .get = (getter)PyBallTree_get_radius,
-        .doc = "get radius associated with the root node",
+        .doc = get_radius_doc,
     },
     {NULL, NULL, NULL, NULL, NULL}
 };
@@ -945,68 +1110,68 @@ static PyMethodDef PyBallTree_methods[] = {
         .ml_name = "from_random",
         .ml_meth = (PyCFunctionWithKeywords)PyBallTree_from_random,
         .ml_flags = METH_CLASS | METH_VARARGS | METH_KEYWORDS,
-        .ml_doc = from_random__doc__
+        .ml_doc = from_random_doc
     },
     {
         .ml_name = "from_file",
         .ml_meth = (PyCFunction)PyBallTree_from_file,
         .ml_flags = METH_CLASS | METH_VARARGS,
-        .ml_doc = "Deserialize a PyBallTree instance from a file"
+        .ml_doc = from_file_doc
     },
     // regular methods
     {
         .ml_name = "to_file",
         .ml_meth = (PyCFunction)PyBallTree_to_file,
         .ml_flags = METH_VARARGS,
-        .ml_doc = to_file__doc__
+        .ml_doc = to_file_doc
     },
     {
         .ml_name = "count_nodes",
         .ml_meth = (PyCFunction)PyBallTree_count_nodes,
         .ml_flags = METH_NOARGS,
-        .ml_doc = "Count nodes contained in tree"
+        .ml_doc = count_nodes_doc
     },
     {
         .ml_name = "get_node_data",
         .ml_meth = (PyCFunction)PyBallTree_get_node_data,
         .ml_flags = METH_NOARGS,
-        .ml_doc = "Get the primary node information"
+        .ml_doc = get_node_data_doc
     },
     {
         .ml_name = "brute_radius",
         .ml_meth = (PyCFunctionWithKeywords)PyBallTree_brute_radius,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
-        .ml_doc = "Count pairs within a radius"
+        .ml_doc = brute_radius_doc
     },
     {
         .ml_name = "count_radius",
         .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_radius,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
-        .ml_doc = "Count pairs within a radius"
+        .ml_doc = count_radius_doc
     },
     {
         .ml_name = "dualcount_radius",
         .ml_meth = (PyCFunction)PyBallTree_dualcount_radius,
         .ml_flags = METH_VARARGS,
-        .ml_doc = "Count pairs within a radius with the dualtree algorithm"
+        .ml_doc = dualcount_radius_doc
     },
     {
         .ml_name = "brute_range",
         .ml_meth = (PyCFunctionWithKeywords)PyBallTree_brute_range,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
-        .ml_doc = "Count pairs within a range"
+        .ml_doc = brute_range_doc
     },
     {
         .ml_name = "count_range",
         .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_range,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
-        .ml_doc = "Count pairs within a range"
+        .ml_doc = count_range_doc
     },
     {
         .ml_name = "dualcount_range",
         .ml_meth = (PyCFunction)PyBallTree_dualcount_range,
         .ml_flags = METH_VARARGS,
-        .ml_doc = "Count pairs within a range with the dualtree algorithm"
+        .ml_doc = dualcount_range_doc
     },
     {NULL, NULL, 0, NULL}
 };
@@ -1014,7 +1179,7 @@ static PyMethodDef PyBallTree_methods[] = {
 static PyTypeObject PyBallTreeType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "balltree.BallTree",
-    .tp_doc = "Python wrapper for C BallTree",
+    .tp_doc = balltree_doc,
     .tp_basicsize = sizeof(PyBallTree),
     .tp_itemsize = 0,
     .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,

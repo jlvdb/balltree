@@ -99,7 +99,7 @@ class TestBallTree:
     def test_init_single(self, mock_data_median):
         tree = BallTree(mock_data_median)
         assert tree.leafsize == default_leafsize
-        assert tree.num_data == 1
+        assert tree.num_points == 1
         assert tree.count_nodes() == 1
         npt.assert_array_equal(tree.data, data_to_view(mock_data_median))
 
@@ -140,7 +140,7 @@ class TestBallTree:
     def test_init_multi_leaf_only(self, mock_data):
         tree = BallTree(mock_data)
         assert tree.leafsize == default_leafsize
-        assert tree.num_data == len(mock_data)
+        assert tree.num_points == len(mock_data)
         assert tree.count_nodes() == 1
         npt.assert_array_equal(tree.data, data_to_view(mock_data))
 
@@ -148,11 +148,11 @@ class TestBallTree:
         leafsize = 4
         tree = BallTree(mock_data, leafsize=leafsize)
         assert tree.leafsize == leafsize
-        assert tree.num_data == len(mock_data)
+        assert tree.num_points == len(mock_data)
         assert tree.count_nodes() == 3
         # check the partitioning
         pivot_x = mock_data_median[0]
-        idx_pivot = tree.num_data // 2
+        idx_pivot = tree.num_points // 2
         npt.assert_array_equal(tree.data[idx_pivot], data_to_view(mock_data_median))
         assert np.all(tree.data[:idx_pivot]["x"] <= pivot_x)
         assert np.all(tree.data[idx_pivot + 1 :]["x"] >= pivot_x)
@@ -211,7 +211,7 @@ class TestBallTree:
 
         restored = BallTree.from_file(fpath)
         assert orig.leafsize == restored.leafsize
-        assert orig.num_data == restored.num_data
+        assert orig.num_points == restored.num_points
         assert orig.count_nodes() == restored.count_nodes()
         npt.assert_array_equal(orig.data, restored.data)
 

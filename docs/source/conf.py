@@ -3,18 +3,23 @@
 # -- Path setup --------------------------------------------------------------
 
 import os
+import sys
 
 try:
     try:  # user has installed the package
         import balltree
     except ImportError:  # try local package location
-        import sys
 
         sys.path.insert(0, os.path.abspath("../.."))
         import balltree
 except ImportError as e:
     if "core._math" in e.args[0]:
         raise RuntimeError("balltree must be compiled") from e
+
+from numpy.typing import ArrayLike, NDArray
+
+sys.path.insert(0, os.path.abspath("."))
+from parse_c_doc import c_doc_to_rst
 
 # -- Project information -----------------------------------------------------
 
@@ -42,6 +47,11 @@ templates_path = ["_templates"]
 exclude_patterns = []
 
 autodoc_inherit_docstrings = True
+autodoc_type_aliases = {
+    ArrayLike: "ArrayArray",
+    NDArray: "NDArray"
+}
+autodoc_member_order = "bysource"
 autosummary_generate = True
 autoclass_content = "both"
 
@@ -106,3 +116,8 @@ with open("../../README.rst") as f:
     readme_text = "".join(f.readlines()[2:])  # drop header line
 with open("index.rst", "w") as f:
     f.write(index_text.replace("%README%", readme_text))
+
+# generate the BallTree documentation
+with open("api/balltree.BallTree.rst", "w") as f:
+    f.write("balltree.BallTree\n=================\n\n\n")
+    f.write(c_doc_to_rst("../../balltree/balltree.c", "balltree"))

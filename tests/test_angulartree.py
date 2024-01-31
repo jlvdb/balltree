@@ -74,14 +74,14 @@ class TestAngularTree:
         with pytest.raises(ValueError, match="dimensions"):
             AngularTree(mock_data[:, :-1])  # covers cases of method calls
 
-    def test_num_data(self, mock_tree, mock_data):
-        assert mock_tree.num_data == len(mock_data)
+    def test_num_points(self, mock_tree, mock_data):
+        assert mock_tree.num_points == len(mock_data)
 
     def test_leafsize(self, mock_tree):
         assert mock_tree.leafsize == default_leafsize
 
     def test_sum_weight(self, mock_tree):
-        assert mock_tree.sum_weight == np.ones(mock_tree.num_data).sum()
+        assert mock_tree.sum_weight == np.ones(mock_tree.num_points).sum()
 
     def test_center(self, mock_data_small):
         tree = AngularTree(mock_data_small)
@@ -96,7 +96,7 @@ class TestAngularTree:
         size = 10000
         tree = AngularTree.from_random(0, limit, -limit, limit, size)
         data = tree.data
-        assert tree.num_data == size
+        assert tree.num_points == size
         assert data["ra"].min() >= 0.0
         assert data["ra"].max() <= limit
         assert data["dec"].min() >= -limit
@@ -109,7 +109,7 @@ class TestAngularTree:
 
         restored = AngularTree.from_file(fpath)
         assert orig.leafsize == restored.leafsize
-        assert orig.num_data == restored.num_data
+        assert orig.num_points == restored.num_points
         assert orig.count_nodes() == restored.count_nodes()
         npt.assert_array_equal(orig.data, restored.data)
 
@@ -127,7 +127,7 @@ class TestAngularTree:
             assert mock_tree.count_radius(point, angle) == count
 
     def test_dualcount_radius(self, mock_tree, test_angles, test_count):
-        N = mock_tree.num_data
+        N = mock_tree.num_points
         for angle, count in zip(test_angles, test_count):
             assert mock_tree.dualcount_radius(mock_tree, angle) == N * count
 
@@ -144,7 +144,7 @@ class TestAngularTree:
         )
 
     def test_dualcount_range(self, mock_tree, test_angles, test_count_range):
-        N = mock_tree.num_data
+        N = mock_tree.num_points
         npt.assert_array_almost_equal(
             mock_tree.dualcount_range(mock_tree, test_angles), test_count_range * N
         )
