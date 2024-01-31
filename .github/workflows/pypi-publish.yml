@@ -1,6 +1,9 @@
 name: PyPI publish
 
 on:
+  push:
+    branches:
+      - main
   release:
     types: 
       - published
@@ -16,13 +19,13 @@ jobs:
       matrix:
         setup:
           - os:    "ubuntu-latest"
-            build: "*manylinux*"
+            build: "manylinux"
           - os:    "ubuntu-latest"
-            build: "*musllinux*"
+            build: "*musllinux"
           - os:    "macos-latest"
-            build: "*macosx*"
+            build: "macosx"
           - os:    "windows-latest"
-            build: "*win*"
+            build: "win"
 
     steps:
       - name: Checkout code
@@ -31,7 +34,7 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.16
         env:
-          CIBW_BUILD: ${{ matrix.setup.build }}
+          CIBW_BUILD: "*${{ matrix.setup.build }}*"
           CIBW_SKIP: "pp*"
           CIBW_TEST_REQUIRES: pytest
           CIBW_TEST_COMMAND: pytest {project}/tests
@@ -40,7 +43,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: ./wheelhouse/*.whl
-          name: artifact-${{ matrix.setup.os }}
+          name: artifact-${{ matrix.setup.os }}-${{ matrix.setup.build }}
 
   build_sdist:
     name: Build sdist and upload to PyPI
