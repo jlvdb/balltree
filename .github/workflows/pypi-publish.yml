@@ -1,9 +1,6 @@
 name: PyPI publish
 
 on:
-  push:
-    branches:
-      - main
   release:
     types: 
       - published

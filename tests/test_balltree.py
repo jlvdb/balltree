@@ -285,6 +285,25 @@ class TestBallTree:
         result = [count_min, count_max - count_min]
         npt.assert_almost_equal(tree.brute_range(data, (rmin, rmax), weight), result)
 
+    def test_count_range_single_radius(self, rand_data_weight):
+        data, weight = rand_data_weight
+        tree = BallTree(data, weight)
+
+        p = data[0]
+        expect = [tree.count_radius(p, 0.2)]
+        npt.assert_almost_equal(tree.count_range(p, 0.2), expect)
+        npt.assert_almost_equal(tree.count_range(p, [0.2]), expect)
+
+    def test_count_range_many_radii(self, rand_data_weight):
+        data, weight = rand_data_weight
+        tree = BallTree(data, weight)
+
+        radii = [0.1, 0.2, 0.3, 0.4]
+        p = data[0]
+        count = [tree.count_radius(p, r) for r in radii]
+        expect = np.diff(count, prepend=0.0)
+        npt.assert_almost_equal(tree.count_range(p, radii), expect)
+
     @pytest.mark.parametrize("rmin,rmax", rminmax_testvalues)
     def test_count_range_single(self, rmin, rmax, rand_data_weight):
         data, weight = rand_data_weight
