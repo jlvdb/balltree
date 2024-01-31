@@ -65,6 +65,7 @@ copybutton_line_continuation_character = "\\"
 pypi = "https://pypi.org/project/balltree"
 html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]
+html_favicon = "_static/icon.ico"
 html_css_files = ["css/custom.css"]
 # html_favicon = "_static/icon.ico"
 html_theme_options = {
@@ -75,10 +76,10 @@ html_theme_options = {
     "show_toc_level": 3,
     "navbar_align": "content",
     "secondary_sidebar_items": ["page-toc"],
-    # "logo": {
-    #     "image_light": "_static/logo-light.svg",
-    #     "image_dark": "_static/logo-dark.svg",
-    # },
+    "logo": {
+        "image_light": "_static/logo.svg",
+        "image_dark": "_static/logo.svg",
+    },
     "pygment_light_style": "xcode",
     "pygment_dark_style": "github-dark",
 }
@@ -93,15 +94,8 @@ html_context = {
 
 # generate the index page
 index_text = """
-Welcome to balltree's documentation!
-====================================
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-   examples
-   api
+Documentation of balltree
+=========================
 
 %README%
 
@@ -112,10 +106,19 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`search`
 """
+toc = """
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   examples
+   api
+"""
 with open("../../README.rst") as f:
-    readme_text = "".join(f.readlines()[2:])  # drop header line
+    content = f.read()
+    readme_text = "".join(content.split("|", 2)[2])  # drop header
 with open("index.rst", "w") as f:
-    f.write(index_text.replace("%README%", readme_text))
+    f.write(index_text.replace("%README%", readme_text).replace("|", toc))
 
 # generate the BallTree documentation
 with open("api/balltree.BallTree.rst", "w") as f:
