@@ -35,7 +35,9 @@ jobs:
         uses: pypa/cibuildwheel@v2.16
         env:
           CIBW_BUILD: ${{ matrix.setup.build }}
-          CIBW_SKIP: cp36* pp*
+          CIBW_SKIP: "pp*"
+          CIBW_TEST_REQUIRES: numpy pytest
+          CIBW_TEST_COMMAND: pytest tests
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
