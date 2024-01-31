@@ -1,9 +1,6 @@
 name: PyPI publish
 
 on:
-  push:
-    branches:
-      - main
   release:
     types: 
       - published
@@ -36,12 +33,7 @@ jobs:
         env:
           CIBW_BUILD: ${{ matrix.setup.build }}
           CIBW_SKIP: "pp*"
-          CIBW_BEFORE_TEST: >
-            echo pwd &&
-            pwd &&
-            echo ls -l &&
-            ls -l
-          CIBW_TEST_REQUIRES: numpy pytest
+          CIBW_TEST_REQUIRES: pytest
           CIBW_TEST_COMMAND: pytest {project}/tests
 
       - name: Upload wheels
@@ -95,8 +87,8 @@ jobs:
           echo ls -l dist
           ls -l dist
 
-#      - name: Publish package
-#        uses: pypa/gh-action-pypi-publish@v1.8
-#        with:
-#          user: __token__
-#          password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@v1.8
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
