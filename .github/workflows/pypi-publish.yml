@@ -36,6 +36,11 @@ jobs:
         env:
           CIBW_BUILD: ${{ matrix.setup.build }}
           CIBW_SKIP: "pp*"
+          CIBW_BEFORE_TEST: >
+            echo pwd &&
+            pwd &&
+            echo ls -l &&
+            ls -l
           CIBW_TEST_REQUIRES: numpy pytest
           CIBW_TEST_COMMAND: pytest tests
 
