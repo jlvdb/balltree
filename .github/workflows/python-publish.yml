@@ -108,7 +108,7 @@ jobs:
         run: |
           python setup.py sdist
           ls -l dist
-          tar tvfz dist/yet_another_wizz-*.tar.gz
+          tar tvfz dist/balltree-*.tar.gz
 
       - name: Copy wheels
         run: |
