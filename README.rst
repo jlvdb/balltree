@@ -6,8 +6,8 @@
 
 .. image:: https://img.shields.io/pypi/v/balltree?logo=pypi&logoColor=blue
     :target: https://pypi.org/project/balltree/
-.. image:: https://github.com/jlvdb/balltree/actions/workflows/python-extension-ci.yml/badge.svg
-    :target: https://github.com/jlvdb/yet_another_wizz/actions/workflows/python-extension-ci.yml
+.. image:: https://github.com/jlvdb/balltree/actions/workflows/python-ci.yml/badge.svg
+    :target: https://github.com/jlvdb/yet_another_wizz/actions/workflows/python-ci.yml
 .. image:: https://readthedocs.org/projects/balltree/badge/?version=latest
     :target: https://balltree.readthedocs.io/en/latest/?badge=latest
 
