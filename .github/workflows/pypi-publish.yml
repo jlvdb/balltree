@@ -42,7 +42,7 @@ jobs:
             echo ls -l &&
             ls -l
           CIBW_TEST_REQUIRES: numpy pytest
-          CIBW_TEST_COMMAND: pytest tests
+          CIBW_TEST_COMMAND: pytest {project}/tests
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
