@@ -45,15 +45,16 @@ class AngularTree(BallTree):
         dec_min: float,
         dec_max: float,
         size: int,
-        leafsize: int | None = None
+        leafsize: int = default_leafsize
     ) -> AngularTree:
         """
         Build a new AngularTree instance from randomly generated points.
         
         The (ra, dec) coordinates are generated uniformly in the interval
         [`ra_min`, `ra_max`) and [`dec_min`, `dec_max`), respectively. `size`
-        controlls the number of points generated. The optional `leafsize` sets
-        the leaf size of the tree.
+        controlls the number of points generated. The optional `leafsize`
+        determines when the tree query algorithms switch from traversal to brute
+        force.
         """
         ((x_min, y_min),) = coord.angular_to_cylinder([ra_min, dec_min])
         ((x_max, y_max),) = coord.angular_to_cylinder([ra_max, dec_max])

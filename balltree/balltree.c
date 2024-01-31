@@ -11,7 +11,7 @@
 PyDoc_STRVAR(
     // .. py:class::
     balltree_doc,
-    "BallTree(xyz: ArrayLike, weight: ArrayLike | None = None, leafsize: int | None = None)\n\n"
+    "BallTree(xyz: ArrayLike, weight: ArrayLike | None = None, leafsize: int = default_leafsize)\n\n"
     "A wrapper for the `C` implementation of BallTree.\n\n"
     "The tree is implemented for 3-dim coordinates and an Euclidean distance\n"
     "metric. It provides different alorigthms to count neighbours within a\n"
@@ -608,12 +608,13 @@ PyDoc_STRVAR(
     // .. py:method::
     //     :classmethod:
     from_random_doc,
-    "from_random(cls, low: float, high: float, size: int, leafsize: int | None = None) -> BallTree\n"
+    "from_random(cls, low: float, high: float, size: int, leafsize: int = default_leafsize) -> BallTree\n"
     "--\n\n"
     "Build a new BallTree instance from randomly generated points.\n\n"
     "The (x, y, z) coordinates are generated uniformly in the interval\n"
     "[`low`, `high`), `size` controlls the number of points generated. The\n"
-    "optional `leafsize` sets the leaf size of the tree."
+    "optional `leafsize` determines when the tree query algorithms switch from\n"
+    "traversal to brute force."
 );
 
 static PyObject *PyBallTree_from_random(
