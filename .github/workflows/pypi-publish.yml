@@ -1,0 +1,86 @@
+name: PyPI publish
+
+on:
+  release:
+    types: 
+      - published
+
+permissions:
+  contents: read
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.setup.os }}
+    runs-on: ${{ matrix.setup.os }}
+    strategy:
+      matrix:
+        setup:
+          - { os: ubuntu-latest,  build:, "*manylinux*" }
+          - { os: ubuntu-latest,  build:, "*musllinux*" }
+          - { os: macos-latest,   build:, "*macosx*" }
+          - { os: windows-latest, build:, "*win*" }
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.15.0
+        env:
+          CIBW_BUILD: ${{ matrix.setup.build }}
+          CIBW_SKIP: cp36* pp*
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: Build sdist and upload to PyPI
+    needs: build_wheels
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install pip
+          python -m pip install -r requirements.txt
+
+      - name: Build and install Python extension
+        run: |
+          python -m pip install -e .
+
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: ./wheels
+
+      - name: Build sdist
+        run: |
+          python setup.py sdist
+          ls -l dist
+          tar tvfz dist/balltree-*.tar.gz
+
+      - name: Copy wheels
+        run: |
+          echo ls -l wheels
+          ls -l wheels
+          echo ls -l wheels/artifact
+          ls -l wheels/artifact
+          cp wheels/artifact/*.whl dist
+          echo ls -l dist
+          ls -l dist
+
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@v1.8
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
