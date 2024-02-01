@@ -1,5 +1,5 @@
 .. image:: https://raw.githubusercontent.com/jlvdb/balltree/main/docs/source/_static/logo.png
-    :width: 750
+    :width: 742
     :alt: balltree
 
 |
@@ -43,4 +43,4 @@ Maintainers
 -----------
 
 - Jan Luca van den Busch
-  (*author*, Ruhr-Universität Bochum, Astronomisches Institut)
+  (*author*, Ruhr-Universit??t Bochum, Astronomisches Institut)
