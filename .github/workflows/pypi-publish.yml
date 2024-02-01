@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build_wheels:
-    name: Build wheels on ${{ matrix.setup.os }} (${{ matrix.setup.build }}${{ matrix.setup.arch }})
+    name: Build wheels for ${{ matrix.setup.build }}/${{ matrix.setup.arch }}
     runs-on: ${{ matrix.setup.os }}-latest
     strategy:
       matrix:
