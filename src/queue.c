@@ -50,39 +50,31 @@ void knque_clear(KnnQueue *queue) {
 }
 
 int knque_insert(KnnQueue *queue, int64_t item_index, double distance) {
-    if (distance >= queue->distance_max) {
-        return 1;
-    }
-    // insertion index must now be at least at end of queue
-
-    // the actual location is reached when the element at the preceeding index
-    // is smaller than the item to be inserted
     QueueItem *items = queue->items;
-    int64_t idx_last = (queue->size > 0) ? (queue->size - 1) : 0;
-    int64_t idx_insert = idx_last;
-    for (; idx_insert >= 0; --idx_insert) {
-        if (items[idx_insert - 1].distance <= distance) {
-            break;
-        }
+
+    // find insertion index, note that (distance < queue->distance_max)
+    int64_t idx_insert = queue->size;
+    while (idx_insert > 0 && distance < items[idx_insert - 1].distance) {
+        --idx_insert;
+    }
+    if (idx_insert == queue->capacity) {
+        return 1;  // item not in queue
     }
 
-    // shift up all items by one to make room for new item, drop last item if
-    // the queue is full
-    int is_full = queue->capacity == queue->size;
-    if (!is_full) {
-        // increase size and shift up last element
-        items[queue->size] = items[idx_last];
-        ++(queue->size);
-    }
-    for (int64_t idx_dest = idx_last; idx_dest > idx_insert; --idx_dest) {
-        items[idx_dest] = items[idx_dest - 1];
+    // make room and insert item, drop last item if at capacity
+    int queue_is_full = queue->size == queue->capacity;
+    int64_t idx = queue_is_full ? (queue->capacity - 1) : queue->size;
+    while (idx > idx_insert) {
+        items[idx] = items[idx - 1];
+        --idx;   
     }
     items[idx_insert].index = item_index;
     items[idx_insert].distance = distance;
 
-    if (is_full) {  // last element in queue has changed
-        queue->distance_max = items[queue->size - 1].distance;
+    // update state of queue
+    if (!queue_is_full) {
+        ++(queue->size);
     }
-
+    queue->distance_max = items[queue->size - 1].distance;
     return 0;
 }
