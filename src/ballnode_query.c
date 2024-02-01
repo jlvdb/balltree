@@ -5,6 +5,7 @@
 
 #include "point.h"
 #include "histogram.h"
+#include "queue.h"
 #include "ballnode.h"
 #include "balltree_macros.h"
 
@@ -35,6 +36,39 @@ static inline void ptslc_dualsumw_in_hist_sq(
     // clear sum_weight after each iteration and add counts to the total
     for (const Point *point = slice1->start; point < slice1->end; ++point) {
         ptslc_sumw_in_hist_sq(slice2, point, hist);
+    }
+}
+
+void bnode_find_neighbours(const BallNode *node, const Point *point, KnnQueue *queue) {
+    int queue_is_full = queue->capacity == queue->size;
+    double distance = sqrt(EUCLIDEAN_DIST_SQ(&node->ball, point));
+    double node_radius = node->ball.radius;
+
+    // case: minimum distance to node exceeds most distant neighbour so far
+    double dist_sq_min = (distance - node_radius) * (distance - node_radius);
+    if (queue_is_full && dist_sq_min >= queue->dist_sq_max) {
+        return;
+    }
+
+    // case: need to traverse further
+    if (BALLNODE_IS_LEAF(node) == false) {
+        BallNode *left = node->childs.left;
+        BallNode *right = node->childs.right;
+        double dist_sq_left = EUCLIDEAN_DIST_SQ(&left->ball, point);
+        double dist_sq_right = EUCLIDEAN_DIST_SQ(&right->ball, point);
+        // priortising closer node may allow pruning more distance node
+        if (dist_sq_left < dist_sq_right) {
+            bnode_find_neighbours(left, point, queue);
+        } else {
+            bnode_find_neighbours(right, point, queue);
+        }
+        return;
+    }
+
+    // case: node is a leaf and any point may be closer than those in queue
+    for (const Point *point = node->data.start; point < node->data.end; ++point) {
+        double dist_sq = EUCLIDEAN_DIST_SQ(point, point);
+        knque_insert(queue, point, dist_sq);
     }
 }
 

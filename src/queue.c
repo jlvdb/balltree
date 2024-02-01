@@ -6,9 +6,6 @@
 #include "queue.h"
 #include "balltree_macros.h"
 
-static inline int knque_is_full(const KnnQueue *queue);
-
-
 KnnQueue *knque_new(int64_t capacity) {
     if (capacity < 1) {
         EMIT_ERR_MSG(ValueError, "KnnQueue capacity must be positive");
@@ -52,10 +49,6 @@ void knque_clear(KnnQueue *queue) {
     }
 }
 
-static inline int knque_is_full(const KnnQueue *queue) {
-    return queue->capacity == queue->size;
-}
-
 int knque_insert(KnnQueue *queue, const QUEUEITEM_T *value, double dist_sq) {
     if (dist_sq >= queue->dist_sq_max) {
         return 1;
@@ -76,7 +69,7 @@ int knque_insert(KnnQueue *queue, const QUEUEITEM_T *value, double dist_sq) {
 
     // shift up all items by one to make room for new item, drop last item if
     // the queue is full
-    int is_full = knque_is_full(queue);
+    int is_full = queue->capacity == queue->size;
     if (!is_full) {
         // increase size and shift up last element
         items[queue->size] = items[idx_last];

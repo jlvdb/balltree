@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "point.h"
 #include "histogram.h"
@@ -67,8 +68,28 @@ void balltree_free(BallTree *tree) {
     free(tree);
 }
 
-int64_t balltree_count_nodes(const BallTree *tree) {
-    return bnode_count_nodes(tree->root);
+QueueItem *balltree_find_neighbours(
+    const BallTree *tree,
+    const Point *point,
+    int64_t num_neighbours,
+    double max_dist
+) {
+    KnnQueue *queue = knque_new(num_neighbours);
+    if (queue == NULL) {
+        return NULL;
+    }
+    queue->dist_sq_max = max_dist * max_dist;
+    bnode_find_neighbours(tree->root, point, queue);
+
+    // copy result to new buffer
+    size_t n_bytes = num_neighbours * sizeof(QueueItem);
+    QueueItem *result = malloc(n_bytes);
+    if (result == NULL) {
+        EMIT_ERR_MSG(MemoryError, "result buffer allocation failed");
+    }
+    memcpy(result, queue->items, n_bytes);
+    knque_free(queue);
+    return result;
 }
 
 double balltree_brute_radius(
@@ -127,6 +148,10 @@ void balltree_dualcount_range(
     DistHistogram *hist
 ) {
     bnode_dualcount_range(tree1->root, tree2->root, hist);
+}
+
+int64_t balltree_count_nodes(const BallTree *tree) {
+    return bnode_count_nodes(tree->root);
 }
 
 StatsVector *balltree_collect_stats(const BallTree *tree) {
