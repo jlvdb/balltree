@@ -13,35 +13,35 @@ permissions:
 
 jobs:
   build_wheels:
-    name: Build wheels on ${{ matrix.setup.os }} (${{ matrix.setup.build }}${{ matrix.setup.build }})
+    name: Build wheels on ${{ matrix.setup.os }} (${{ matrix.setup.build }}${{ matrix.setup.arch }})
     runs-on: ${{ matrix.setup.os }}-latest
     strategy:
       matrix:
         setup:
         - os:    "ubuntu"
           build: "manylinux"
-          arch:  "_i686"
+          arch:  "i686"
         - os:    "ubuntu"
           build: "manylinux"
-          arch:  "_x86_64"
+          arch:  "x86_64"
         - os:    "ubuntu"
           build: "musllinux"
-          arch:  "_i686"
+          arch:  "i686"
         - os:    "ubuntu"
           build: "musllinux"
-          arch:  "_x86_64"
+          arch:  "x86_64"
         - os:    "macos"
           build: "macosx"
-          arch:  "_x86_64"
+          arch:  "x86_64"
         - os:    "macos"
           build: "macosx"
-          arch:  "_arm64"
+          arch:  "arm64"
         - os:    "windows"
           build: "win"
-          arch:  "32"
+          arch:  "x86"
         - os:    "windows"
           build: "win"
-          arch:  "_amd64"
+          arch:  "amd64"
 
     steps:
     - name: Checkout code
@@ -50,16 +50,17 @@ jobs:
     - name: Build wheels
       uses: pypa/cibuildwheel@v2.16
       env:
-        CIBW_BUILD: "*${{ matrix.setup.build }}${{ matrix.setup.arch }}"
+        CIBW_BUILD: "*${{ matrix.setup.build }}*"
         CIBW_SKIP: "pp*"
+        CIBW_ARCHS: ${{ matrix.setup.arch }}
         CIBW_TEST_REQUIRES: pytest
         CIBW_TEST_COMMAND: pytest {project}/tests
 
     - name: Upload wheels
       uses: actions/upload-artifact@v4
       with:
-        name: cibw-wheel-${{ matrix.setup.os }}-${{ matrix.setup.build }}${{ matrix.setup.arch }}
-        path: dist/*.whl
+        name: cibw-wheel-${{ matrix.setup.os }}-${{ matrix.setup.build }}-${{ matrix.setup.arch }}
+        path: ./wheelhouse/*.whl
 
   build_sdist:
     name: Build sdist
