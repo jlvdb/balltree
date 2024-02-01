@@ -41,7 +41,7 @@ void knque_free(KnnQueue *queue) {
 void knque_clear(KnnQueue *queue) {
     queue->size = 0;
     queue->distance_max = INFINITY;
-    for (long i = 0; i < queue->capacity; ++i) {
+    for (int64_t i = 0; i < queue->capacity; ++i) {
         queue->items[i] = (QueueItem){
             .index = -1,
             .distance = INFINITY,
@@ -58,8 +58,8 @@ int knque_insert(KnnQueue *queue, int64_t item_index, double distance) {
     // the actual location is reached when the element at the preceeding index
     // is smaller than the item to be inserted
     QueueItem *items = queue->items;
-    long idx_last = (queue->size > 0) ? (queue->size - 1) : 0;
-    long idx_insert = idx_last;
+    int64_t idx_last = (queue->size > 0) ? (queue->size - 1) : 0;
+    int64_t idx_insert = idx_last;
     for (; idx_insert >= 0; --idx_insert) {
         if (items[idx_insert - 1].distance <= distance) {
             break;
@@ -74,7 +74,7 @@ int knque_insert(KnnQueue *queue, int64_t item_index, double distance) {
         items[queue->size] = items[idx_last];
         ++(queue->size);
     }
-    for (long idx_dest = idx_last; idx_dest > idx_insert; --idx_dest) {
+    for (int64_t idx_dest = idx_last; idx_dest > idx_insert; --idx_dest) {
         items[idx_dest] = items[idx_dest - 1];
     }
     items[idx_insert].index = item_index;

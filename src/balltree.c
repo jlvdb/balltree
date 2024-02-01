@@ -78,8 +78,11 @@ QueueItem *balltree_nearest_neighbours(
     if (queue == NULL) {
         return NULL;
     }
-    queue->distance_max = max_dist;
+    if (max_dist >= 0.0) {
+        queue->distance_max = max_dist;
+    }
     bnode_nearest_neighbours(tree->root, point, queue);
+    printf("WARNING: The first element is dropped on insertion!\n");
 
     // copy result to new buffer
     size_t n_bytes = num_neighbours * sizeof(QueueItem);

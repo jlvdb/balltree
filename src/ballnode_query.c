@@ -39,9 +39,9 @@ static inline void ptslc_dualsumw_in_hist_sq(
     }
 }
 
-void bnode_nearest_neighbours(const BallNode *node, const Point *point, KnnQueue *queue) {
+void bnode_nearest_neighbours(const BallNode *node, const Point *ref_point, KnnQueue *queue) {
     int queue_is_full = queue->capacity == queue->size;
-    double distance = sqrt(EUCLIDEAN_DIST_SQ(&node->ball, point));
+    double distance = sqrt(EUCLIDEAN_DIST_SQ(&node->ball, ref_point));
 
     // case: minimum distance to node exceeds most distant neighbour so far
     if (queue_is_full && distance - node->ball.radius >= queue->distance_max) {
@@ -52,20 +52,22 @@ void bnode_nearest_neighbours(const BallNode *node, const Point *point, KnnQueue
     if (BALLNODE_IS_LEAF(node) == false) {
         BallNode *left = node->childs.left;
         BallNode *right = node->childs.right;
-        double dist_sq_left = EUCLIDEAN_DIST_SQ(&left->ball, point);
-        double dist_sq_right = EUCLIDEAN_DIST_SQ(&right->ball, point);
+        double dist_sq_left = EUCLIDEAN_DIST_SQ(&left->ball, ref_point);
+        double dist_sq_right = EUCLIDEAN_DIST_SQ(&right->ball, ref_point);
         // priortising closer node may allow pruning more distance node
         if (dist_sq_left < dist_sq_right) {
-            bnode_nearest_neighbours(left, point, queue);
+            bnode_nearest_neighbours(left, ref_point, queue);
+            bnode_nearest_neighbours(right, ref_point, queue);
         } else {
-            bnode_nearest_neighbours(right, point, queue);
+            bnode_nearest_neighbours(right, ref_point, queue);
+            bnode_nearest_neighbours(left, ref_point, queue);
         }
         return;
     }
 
     // case: node is a leaf and any point may be closer than those in queue
     for (const Point *point = node->data.start; point < node->data.end; ++point) {
-        double distance = sqrt(EUCLIDEAN_DIST_SQ(point, point));
+        double distance = sqrt(EUCLIDEAN_DIST_SQ(ref_point, point));
         knque_insert(queue, point->index, distance);
     }
 }

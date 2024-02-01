@@ -65,6 +65,7 @@ void inputiterdata_free(InputIterData *);
 static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj);
 static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer);
 static PyObject *statvec_get_numpy_array(StatsVector *vec);
+static PyObject *queueitems_get_numpy_array(QueueItem *items, npy_intp size);
 static DistHistogram *disthistogram_from_PyObject(PyObject *edges_obj);
 static PyObject *PyObject_from_disthistogram(DistHistogram *hist);
 static PyObject *PyBallTree_accumulate_radius(PyBallTree *self, count_radius_func accumulator, PyObject *xyz_obj, double radius, PyObject *weight_obj);
@@ -87,6 +88,7 @@ static PyObject *PyBallTree_get_radius(PyBallTree *self, void *closure);
 static PyObject *PyBallTree_str(PyObject *self);
 static PyObject *PyBallTree_to_file(PyBallTree *self, PyObject *args);
 static PyObject *PyBallTree_count_nodes(PyBallTree *self);
+static PyObject *PyBallTree_nearest_neighbours(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_get_node_data(PyBallTree *self);
 static PyObject *PyBallTree_brute_radius(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_count_radius(PyBallTree *self, PyObject *args, PyObject *kwargs);
@@ -500,12 +502,43 @@ static PyObject *statvec_get_numpy_array(StatsVector *vec) {
 
     // create an uninitialised array and copy the data into it
     PyObject *array = PyArray_Empty(ndim, shape, arr_descr, 0);
-    Py_DECREF(arr_descr);
     if (array == NULL) {
         return NULL;
     }
     void *ptr = PyArray_DATA(array);
     memcpy(ptr, vec->stats, sizeof(NodeStats) * vec->size);
+    return array;
+}
+
+static PyObject *queueitems_get_numpy_array(QueueItem *items, npy_intp size) {
+    const npy_intp ndim = 1;
+    npy_intp shape[1] = {size};
+
+    // construct an appropriate dtype for QueueItem buffer
+    PyObject *arr_dtype = Py_BuildValue(
+        "[(ss)(ss)]",
+        "index", "i8",
+        "distance", "f8"
+    );
+    if (arr_dtype == NULL) {
+        return NULL;
+    }
+
+    // get the numpy API array descriptor
+    PyArray_Descr *arr_descr;
+    int result = PyArray_DescrConverter(arr_dtype, &arr_descr);  // PyArray_Descr **
+    Py_DECREF(arr_dtype);
+    if (result != NPY_SUCCEED) {
+        return NULL;
+    }
+
+    // create an uninitialised array and copy the data into it
+    PyObject *array = PyArray_Empty(ndim, shape, arr_descr, 0);
+    if (array == NULL) {
+        return NULL;
+    }
+    void *ptr = PyArray_DATA(array);
+    memcpy(ptr, items, sizeof(QueueItem) * size);
     return array;
 }
 
@@ -800,7 +833,7 @@ static PyObject *PyBallTree_str(PyObject *self) {
     int n_bytes = snprintf(
         buffer,
         sizeof(buffer),
-        "BallTree(num_points=%ld, radius=%lf, center=(%lf, %lf, %lf))",
+        "BallTree(num_points=%lld, radius=%lf, center=(%lf, %lf, %lf))",
         tree->data->size,
         node->ball.radius,
         node->ball.x,
@@ -877,6 +910,62 @@ static PyObject *PyBallTree_get_node_data(PyBallTree *self) {
     PyObject *array = statvec_get_numpy_array(vec);
     statvec_free(vec);
     return array;
+}
+
+PyDoc_STRVAR(
+    // .. py:method::
+    nearest_neighbours_doc,
+    "nearest_neighbours(self, xyz: ArrayLike, k: int, max_dist: float) -> NDArray\n"
+    "--\n\n"
+    "Find a number of nearest neighbours.\n\n"
+    "TODO"
+);
+
+static PyObject *PyBallTree_nearest_neighbours(
+    PyBallTree *self,
+    PyObject *args,
+    PyObject *kwargs
+) {
+    static char *kwlist[] = {"xyz", "k", "max_dist", NULL};
+    PyObject *xyz_obj;
+    int num_neighbours;
+    double max_dist = -1.0;
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, "Oi|d", kwlist,
+            &xyz_obj, &num_neighbours, &max_dist)
+    ) {
+        return NULL;
+    }
+
+    InputIterData *data = inputiterdata_new(xyz_obj, Py_None);
+    if (data == NULL) {
+        return NULL;
+    }
+
+    // find neighbours for all inputs
+    int64_t idx = 0;
+    Point point = {0.0, 0.0, 0.0, 0.0, 0};
+    PyObject *pyresult = NULL;
+    while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
+        QueueItem *result = balltree_nearest_neighbours(
+            self->balltree,
+            &point,
+            num_neighbours,
+            max_dist
+        );
+        if (result == NULL) {
+            inputiterdata_free(data);
+            return NULL;
+        }
+        pyresult = queueitems_get_numpy_array(result, num_neighbours);
+        free(result);
+
+        break;
+        ++idx;
+    }
+    inputiterdata_free(data);
+
+    return pyresult;
 }
 
 PyDoc_STRVAR(
@@ -1144,6 +1233,12 @@ static PyMethodDef PyBallTree_methods[] = {
         .ml_meth = (PyCFunction)PyBallTree_get_node_data,
         .ml_flags = METH_NOARGS,
         .ml_doc = get_node_data_doc
+    },
+    {
+        .ml_name = "nearest_neighbours",
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_nearest_neighbours,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = nearest_neighbours_doc
     },
     {
         .ml_name = "brute_radius",

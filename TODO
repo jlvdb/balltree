@@ -1,0 +1,2 @@
+add test for each method with chaining to check for memory leaks
+reimplement queue passing to improve nearest neighbour search for multiple inputs in python
