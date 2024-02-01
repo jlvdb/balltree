@@ -50,6 +50,10 @@ void knque_clear(KnnQueue *queue) {
 }
 
 int knque_insert(KnnQueue *queue, int64_t item_index, double distance) {
+    if (distance >= queue->distance_max) {
+        return 1;  // item not in queue
+    }
+
     QueueItem *items = queue->items;
 
     // find insertion index, note that (distance < queue->distance_max)
@@ -57,9 +61,7 @@ int knque_insert(KnnQueue *queue, int64_t item_index, double distance) {
     while (idx_insert > 0 && distance < items[idx_insert - 1].distance) {
         --idx_insert;
     }
-    if (idx_insert == queue->capacity) {
-        return 1;  // item not in queue
-    }
+    // very first if statement guarantees (idx_insert < queue->capacity)
 
     // make room and insert item, drop last item if at capacity
     int queue_is_full = queue->size == queue->capacity;
@@ -74,7 +76,8 @@ int knque_insert(KnnQueue *queue, int64_t item_index, double distance) {
     // update state of queue
     if (!queue_is_full) {
         ++(queue->size);
+    } else {
+        queue->distance_max = items[queue->size - 1].distance;
     }
-    queue->distance_max = items[queue->size - 1].distance;
     return 0;
 }

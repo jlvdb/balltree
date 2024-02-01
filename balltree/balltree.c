@@ -947,6 +947,11 @@ static PyObject *PyBallTree_nearest_neighbours(
     Point point = {0.0, 0.0, 0.0, 0.0, 0};
     PyObject *pyresult = NULL;
     while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
+        if (idx > 0) {
+            PyErr_SetString(PyExc_NotImplementedError, "multiple neighbour query not yet available");
+            return NULL;
+        }
+
         QueueItem *result = balltree_nearest_neighbours(
             self->balltree,
             &point,
@@ -954,17 +959,15 @@ static PyObject *PyBallTree_nearest_neighbours(
             max_dist
         );
         if (result == NULL) {
-            inputiterdata_free(data);
-            return NULL;
+            goto error;
         }
         pyresult = queueitems_get_numpy_array(result, num_neighbours);
         free(result);
-
-        break;
         ++idx;
     }
-    inputiterdata_free(data);
 
+error:
+    inputiterdata_free(data);
     return pyresult;
 }
 
