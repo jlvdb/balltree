@@ -74,11 +74,12 @@ class AngularTree(BallTree):
             np.transpose([data["x"], data["y"], data["z"]])
         )
 
-        dtype = [("ra", "f8"), ("dec", "f8"), ("weight", "f8")]
+        dtype = [("ra", "f8"), ("dec", "f8"), ("weight", "f8"), ("index", "i8")]
         array = np.empty(len(data), dtype=dtype)
         array["ra"] = radec[:, 0]
         array["dec"] = radec[:, 1]
         array["weight"] = data["weight"]
+        array["index"] = data["index"]
         return array
 
     @property
@@ -102,7 +103,7 @@ class AngularTree(BallTree):
         center = coord.angular_to_euclidean(self.center)[0]
         radec_flat = self.data.view("f8")
         shape = (self.num_points, -1)
-        xyz = coord.angular_to_euclidean(radec_flat.reshape(shape)[:, :-1])
+        xyz = coord.angular_to_euclidean(radec_flat.reshape(shape)[:, :-2])
         # compute the maximum distance from the center project one the sphere
         diff = xyz - center[np.newaxis, :]
         dist = np.sqrt(np.sum(diff**2, axis=1))

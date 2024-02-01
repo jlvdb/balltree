@@ -56,14 +56,15 @@ def rand_data_weight():
     return (rng.uniform(-1.0, 1.0, size=(size, 3)), rng.normal(1.0, 0.02, size))
 
 
-def data_to_view(data, weight=True):
-    dtype = [("x", "f8"), ("y", "f8"), ("z", "f8"), ("weight", "f8")]
+def data_to_view(data, weight=None, index=None):
+    dtype = [("x", "f8"), ("y", "f8"), ("z", "f8"), ("weight", "f8"), ("index", "i8")]
     data = np.atleast_2d(data)
     array = np.empty(len(data), dtype=dtype)
     array["x"] = data[:, 0]
     array["y"] = data[:, 1]
     array["z"] = data[:, 2]
     array["weight"] = weight if weight is not None else 1.0
+    array["index"] = index if index is not None else np.arange(len(data))
     return array
 
 
@@ -153,7 +154,7 @@ class TestBallTree:
         # check the partitioning
         pivot_x = mock_data_median[0]
         idx_pivot = tree.num_points // 2
-        npt.assert_array_equal(tree.data[idx_pivot], data_to_view(mock_data_median))
+        npt.assert_array_equal(tree.data[idx_pivot], data_to_view(mock_data_median, index=5))
         assert np.all(tree.data[:idx_pivot]["x"] <= pivot_x)
         assert np.all(tree.data[idx_pivot + 1 :]["x"] >= pivot_x)
         # check the data elements where swapped correctly
@@ -198,11 +199,13 @@ class TestBallTree:
         high = 1.0
         size = 100000
         tree = BallTree.from_random(low, high, size)
-        data = np.array(tree.data.tolist())
+        data = tree.data
         assert len(data) == size
-        assert data.min() >= low
-        assert data.max() <= high
-        assert np.all(data[:, -1] == 1.0)
+        for coord in "xyz":
+            assert data[coord].min() >= low
+            assert data[coord].max() <= high
+        assert np.all(data["weight"] == 1.0)
+        assert np.all(np.sort(data["index"]) == np.arange(size))
 
     def test_to_from_file(self, mock_data, mock_weight, tmp_path):
         fpath = str(tmp_path / "tree.dump")

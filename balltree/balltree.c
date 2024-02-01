@@ -393,7 +393,12 @@ static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj
     int64_t idx = 0;
     double x, y, z;
     while (iter_get_next_xyz(data->xyz_iter, &x, &y, &z)) {
-        buffer->points[idx] = (Point){x, y, z, data->weight_buffer[idx]};
+        Point *point = buffer->points + idx;
+        point->x = x;
+        point->y = y;
+        point->z = z;
+        point->weight = data->weight_buffer[idx];
+        // index is already initialised
         ++idx;
     }
     inputiterdata_free(data);
@@ -406,11 +411,12 @@ static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
 
     // construct an appropriate dtype for Point
     PyObject *arr_dtype = Py_BuildValue(
-        "[(ss)(ss)(ss)(ss)]",
+        "[(ss)(ss)(ss)(ss)(ss)]",
         "x", "f8",
         "y", "f8",
         "z", "f8",
-        "weight", "f8"
+        "weight", "f8",
+        "index", "i8"
     );
     if (arr_dtype == NULL) {
         return NULL;
@@ -517,7 +523,7 @@ static PyObject *PyBallTree_accumulate_radius(
     // count neighbours for all inputs
     double count = 0.0;
     int64_t idx = 0;
-    Point point;
+    Point point = {0.0, 0.0, 0.0, 0.0, 0};
     while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
         point.weight = data->weight_buffer[idx];
         count += accumulator(self->balltree, &point, radius);
@@ -545,7 +551,7 @@ static PyObject *PyBallTree_accumulate_range(
     }
     // count neighbours for all inputs
     int64_t idx = 0;
-    Point point;
+    Point point = {0.0, 0.0, 0.0, 0};
     while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
         point.weight = data->weight_buffer[idx];
         accumulator(self->balltree, &point, hist);

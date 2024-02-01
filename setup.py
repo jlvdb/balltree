@@ -14,6 +14,7 @@ balltree = Extension(
         "src/point.c",
         "src/pointbuffers.c",
         "src/histogram.c",
+        "src/queue.c",
         "src/ballnode.c",
         "src/ballnode_stats.c",
         "src/ballnode_query.c",
