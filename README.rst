@@ -7,7 +7,7 @@
 .. image:: https://img.shields.io/pypi/v/balltree?logo=pypi&logoColor=blue
     :target: https://pypi.org/project/balltree/
 .. image:: https://github.com/jlvdb/balltree/actions/workflows/python-ci.yml/badge.svg
-    :target: https://github.com/jlvdb/yet_another_wizz/actions/workflows/python-ci.yml
+    :target: https://github.com/jlvdb/balltree/actions/workflows/python-ci.yml
 .. image:: https://readthedocs.org/projects/balltree/badge/?version=latest
     :target: https://balltree.readthedocs.io/en/latest/?badge=latest
 
@@ -21,6 +21,10 @@ The tree is optimised towards spatial correlation function calculations since
 the query routines are geared towards range queries, i.e. counting pairs with a
 given (range of) separations. Fixed number nearest neighbour search is currently
 not implemented.
+
+- Code: https://github.com/jlvdb/balltree.git
+- Docs: https://balltree.readthedocs.io/
+- PyPI: https://pypi.org/project/balltree/
 
 .. toc
 
