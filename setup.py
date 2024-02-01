@@ -5,7 +5,7 @@ from setuptools import Extension, setup
 if platform.system() == "Windows":
     platform_flags = ["/Ox", "/fp:fast"]
 else:
-    platform_flags = ["-O3", "-ffast-math", "-march=native"]
+    platform_flags = ["-O3", "-ffast-math"]
 
 balltree = Extension(
     name="balltree.balltree",

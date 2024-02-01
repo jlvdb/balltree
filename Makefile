@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Iinclude -Wall -O3 -ffast-math -march=native -fPIC
+CFLAGS = -Iinclude -Wall -O3 -ffast-math -fPIC
 LDFLAGS = -shared
 SRCDIR = src
 BUILDDIR = build
