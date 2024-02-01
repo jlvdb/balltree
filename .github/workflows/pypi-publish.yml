@@ -13,35 +13,35 @@ permissions:
 
 jobs:
   build_wheels:
-    name: Build wheels on ${{ matrix.setup.os }} (${{ matrix.setup.build }})
-    runs-on: ${{ matrix.setup.os }}
+    name: Build wheels on ${{ matrix.setup.os }} (${{ matrix.setup.build }}${{ matrix.setup.build }})
+    runs-on: ${{ matrix.setup.os }}-latest
     strategy:
       matrix:
         setup:
-        - os:    "ubuntu-latest"
+        - os:    "ubuntu"
           build: "manylinux"
-          arch:  "i686"
-        - os:    "ubuntu-latest"
+          arch:  "_i686"
+        - os:    "ubuntu"
           build: "manylinux"
-          arch:  "x86_64"
-        - os:    "ubuntu-latest"
+          arch:  "_x86_64"
+        - os:    "ubuntu"
           build: "musllinux"
-          arch:  "i686"
-        - os:    "ubuntu-latest"
+          arch:  "_i686"
+        - os:    "ubuntu"
           build: "musllinux"
-          arch:  "x86_64"
-        - os:    "macos-latest"
+          arch:  "_x86_64"
+        - os:    "macos"
           build: "macosx"
-          arch:  "x86_64"
-        - os:    "macos-latest"
+          arch:  "_x86_64"
+        - os:    "macos"
           build: "macosx"
-          arch:  "arm64"
-        - os:    "windows-latest"
+          arch:  "_arm64"
+        - os:    "windows"
           build: "win"
           arch:  "32"
-        - os:    "windows-latest"
+        - os:    "windows"
           build: "win"
-          arch:  "amd64"
+          arch:  "_amd64"
 
     steps:
     - name: Checkout code
@@ -50,7 +50,7 @@ jobs:
     - name: Build wheels
       uses: pypa/cibuildwheel@v2.16
       env:
-        CIBW_BUILD: "*${{ matrix.setup.build }}*${{ matrix.setup.arch }}"
+        CIBW_BUILD: "*${{ matrix.setup.build }}${{ matrix.setup.arch }}"
         CIBW_SKIP: "pp*"
         CIBW_TEST_REQUIRES: pytest
         CIBW_TEST_COMMAND: pytest {project}/tests
@@ -58,7 +58,7 @@ jobs:
     - name: Upload wheels
       uses: actions/upload-artifact@v4
       with:
-        name: cibw-wheel-${{ matrix.setup.os }}-${{ matrix.setup.build }}-${{ matrix.setup.arch }}
+        name: cibw-wheel-${{ matrix.setup.os }}-${{ matrix.setup.build }}${{ matrix.setup.arch }}
         path: dist/*.whl
 
   build_sdist:
