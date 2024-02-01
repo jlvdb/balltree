@@ -41,7 +41,7 @@ jobs:
           arch:  "x86"
         - os:    "windows"
           build: "win"
-          arch:  "amd64"
+          arch:  "AMD64"
 
     steps:
     - name: Checkout code
