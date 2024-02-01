@@ -13,7 +13,7 @@ typedef struct {
     double max;
 } Limits;
 
-static Limits limits_new();
+static Limits limits_new(void);
 static void limits_update(Limits *limits, double value);
 static double limits_get_range(Limits *limits);
 
@@ -28,7 +28,7 @@ static Point *ptslc_quickselect(PointSlice *slice, Point *partition, enum Axis a
 static Point *ptslc_partition_maxspread_axis(PointSlice *slice);
 
 
-static Limits limits_new() {
+static Limits limits_new(void) {
     return (Limits){INFINITY, -INFINITY};
 }
 

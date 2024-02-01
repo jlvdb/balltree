@@ -4,7 +4,7 @@
 #include "ballnode.h"
 #include "balltree_macros.h"
 
-StatsVector *statvec_new() {
+StatsVector *statvec_new(void) {
     return statvec_new_reserve(32L);
 }
 

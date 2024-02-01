@@ -63,6 +63,7 @@ double bnode_dualcount_radius(const BallNode *, const BallNode *, double);
 void bnode_dualcount_range(const BallNode *, const BallNode *, DistHistogram *);
 
 // from ballnode_stats.c
+StatsVector *statvec_new(void);
 StatsVector *statvec_new_reserve(int64_t);
 void statvec_free(StatsVector *);
 int statvec_resize(StatsVector *, int64_t);
