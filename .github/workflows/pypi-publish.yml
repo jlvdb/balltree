@@ -1,9 +1,6 @@
 name: PyPI publish
 
 on:
-  push:
-    branches:
-    - main
   release:
     types: 
     - published
@@ -14,34 +11,34 @@ permissions:
 jobs:
   build_wheels:
     name: Build wheels for ${{ matrix.setup.build }}/${{ matrix.setup.arch }}
-    runs-on: ${{ matrix.setup.os }}-latest
+    runs-on: ${{ matrix.setup.os }}
     strategy:
       matrix:
         setup:
-        - os:    "ubuntu"
-          build: "manylinux"
-          arch:  "i686"
-        - os:    "ubuntu"
-          build: "manylinux"
-          arch:  "x86_64"
-        - os:    "ubuntu"
-          build: "musllinux"
-          arch:  "i686"
-        - os:    "ubuntu"
-          build: "musllinux"
-          arch:  "x86_64"
-        - os:    "macos"
-          build: "macosx"
-          arch:  "x86_64"
-        - os:    "macos"
-          build: "macosx"
-          arch:  "arm64"
-        - os:    "windows"
-          build: "win"
-          arch:  "x86"
-        - os:    "windows"
-          build: "win"
-          arch:  "AMD64"
+        - os:    ubuntu-latest
+          build: manylinux
+          arch:  i686
+        - os:    ubuntu-latest
+          build: manylinux
+          arch:  x86_64
+        - os:    ubuntu-latest
+          build: musllinux
+          arch:  i686
+        - os:    ubuntu-latest
+          build: musllinux
+          arch:  x86_64
+        - os:    macos-latest
+          build: macosx
+          arch:  x86_64
+        - os:    macos-latest
+          build: macosx
+          arch:  arm64
+        - os:    windows-latest
+          build: win
+          arch:  x86
+        - os:    windows-latest
+          build: win
+          arch:  AMD64
 
     steps:
     - name: Checkout code
@@ -59,7 +56,7 @@ jobs:
     - name: Upload wheels
       uses: actions/upload-artifact@v4
       with:
-        name: cibw-wheel-${{ matrix.setup.os }}-${{ matrix.setup.build }}-${{ matrix.setup.arch }}
+        name: cibw-wheel-${{ matrix.setup.build }}-${{ matrix.setup.arch }}
         path: ./wheelhouse/*.whl
 
   build_sdist:
@@ -92,8 +89,8 @@ jobs:
         path: dist
         merge-multiple: true
 
-#    - name: Publish package
-#      uses: pypa/gh-action-pypi-publish@v1.8.11
-#      with:
-#        user: __token__
-#        password: ${{ secrets.PYPI_API_TOKEN }}
+    - name: Publish package
+      uses: pypa/gh-action-pypi-publish@v1.8.11
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
