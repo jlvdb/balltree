@@ -5,24 +5,21 @@
 
 #include "point.h"
 
-# define QUEUEITEM_T Point
-# define QUEUEITEM_DEFAULT (Point){0.0, 0.0, 0.0, 0.0}
-
 typedef struct {
-    QUEUEITEM_T value;
-    double dist_sq;
+    int64_t index;
+    double distance;
 } QueueItem;
 
 typedef struct {
     int64_t capacity;
     int64_t size;
     QueueItem *items;
-    double dist_sq_max;
+    double distance_max;
 } KnnQueue;
 
 KnnQueue *knque_new(int64_t);
 void knque_free(KnnQueue *);
 void knque_clear(KnnQueue *queue);
-int knque_insert(KnnQueue *, const QUEUEITEM_T *, double);
+int knque_insert(KnnQueue *, int64_t, double);
 
 #endif /* QUEUE_H */

@@ -12,6 +12,7 @@ Point point_create_weighted(double x, double y, double z, double weight) {
         .y = y,
         .z = z,
         .weight = weight,
+        .index = 0,
     };
 }
 

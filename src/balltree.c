@@ -68,7 +68,7 @@ void balltree_free(BallTree *tree) {
     free(tree);
 }
 
-QueueItem *balltree_find_neighbours(
+QueueItem *balltree_nearest_neighbours(
     const BallTree *tree,
     const Point *point,
     int64_t num_neighbours,
@@ -78,8 +78,8 @@ QueueItem *balltree_find_neighbours(
     if (queue == NULL) {
         return NULL;
     }
-    queue->dist_sq_max = max_dist * max_dist;
-    bnode_find_neighbours(tree->root, point, queue);
+    queue->distance_max = max_dist;
+    bnode_nearest_neighbours(tree->root, point, queue);
 
     // copy result to new buffer
     size_t n_bytes = num_neighbours * sizeof(QueueItem);

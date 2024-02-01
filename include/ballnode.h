@@ -58,7 +58,7 @@ int bnode_is_leaf(const BallNode *);
 PointSlice bnode_get_ptslc(const BallNode *);
 
 // from ballnode_query.c
-void bnode_find_neighbours(const BallNode *, const Point *, KnnQueue *);
+void bnode_nearest_neighbours(const BallNode *, const Point *, KnnQueue *);
 double bnode_count_radius(const BallNode *, const Point *, double);
 void bnode_count_range(const BallNode *, const Point *, DistHistogram *);
 double bnode_dualcount_radius(const BallNode *, const BallNode *, double);

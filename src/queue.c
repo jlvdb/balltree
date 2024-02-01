@@ -40,17 +40,17 @@ void knque_free(KnnQueue *queue) {
 
 void knque_clear(KnnQueue *queue) {
     queue->size = 0;
-    queue->dist_sq_max = INFINITY;
+    queue->distance_max = INFINITY;
     for (long i = 0; i < queue->capacity; ++i) {
         queue->items[i] = (QueueItem){
-            .value = QUEUEITEM_DEFAULT,
-            .dist_sq = INFINITY,
+            .index = -1,
+            .distance = INFINITY,
         };
     }
 }
 
-int knque_insert(KnnQueue *queue, const QUEUEITEM_T *value, double dist_sq) {
-    if (dist_sq >= queue->dist_sq_max) {
+int knque_insert(KnnQueue *queue, int64_t item_index, double distance) {
+    if (distance >= queue->distance_max) {
         return 1;
     }
     // insertion index must now be at least at end of queue
@@ -61,8 +61,7 @@ int knque_insert(KnnQueue *queue, const QUEUEITEM_T *value, double dist_sq) {
     long idx_last = (queue->size > 0) ? (queue->size - 1) : 0;
     long idx_insert = idx_last;
     for (; idx_insert >= 0; --idx_insert) {
-        double dist_sq_next = items[idx_insert - 1].dist_sq;
-        if (dist_sq_next <= dist_sq) {
+        if (items[idx_insert - 1].distance <= distance) {
             break;
         }
     }
@@ -78,11 +77,11 @@ int knque_insert(KnnQueue *queue, const QUEUEITEM_T *value, double dist_sq) {
     for (long idx_dest = idx_last; idx_dest > idx_insert; --idx_dest) {
         items[idx_dest] = items[idx_dest - 1];
     }
-    items[idx_insert].value = *value;
-    items[idx_insert].dist_sq = dist_sq;
+    items[idx_insert].index = item_index;
+    items[idx_insert].distance = distance;
 
     if (is_full) {  // last element in queue has changed
-        queue->dist_sq_max = items[queue->size - 1].dist_sq;
+        queue->distance_max = items[queue->size - 1].distance;
     }
 
     return 0;

@@ -10,6 +10,7 @@ typedef struct {
     double y;
     double z;
     double weight;
+    int64_t index;
 } Point;
 
 typedef struct {
@@ -35,8 +36,6 @@ double point_dist_sq(const Point *, const Point *);
 
 // from pointbuffers.c
 PointBuffer *ptbuf_new(int64_t);
-PointBuffer *ptbuf_from_buffers(int64_t, double *, double *, double *);
-PointBuffer *ptbuf_from_buffers_weighted(int64_t, double *, double *, double *, double *);
 void ptbuf_free(PointBuffer *);
 int ptbuf_resize(PointBuffer *, int64_t);
 PointBuffer *ptbuf_copy(const PointBuffer *);
