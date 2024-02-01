@@ -1,5 +1,11 @@
+import platform
 import numpy as np
 from setuptools import Extension, setup
+
+if platform.system() == "Windows":
+    platform_flags = ["/Ox", "/fp:fast"]
+else:
+    platform_flags = ["-O3", "-ffast-math", "-march=native"]
 
 balltree = Extension(
     name="balltree.balltree",
@@ -17,9 +23,7 @@ balltree = Extension(
     include_dirs=["include", np.get_include()],
     extra_compile_args=[
         "-Wall",
-        "-O3",
-        "-ffast-math",
-        "-march=native",
+        *platform_flags,
         "-DSET_PYERR_STRING",  # required to propagate C errors to python
     ],
 )
