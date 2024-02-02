@@ -56,14 +56,15 @@ def rand_data_weight():
     return (rng.uniform(-1.0, 1.0, size=(size, 3)), rng.normal(1.0, 0.02, size))
 
 
-def data_to_view(data, weight=True):
-    dtype = [("x", "f8"), ("y", "f8"), ("z", "f8"), ("weight", "f8")]
+def data_to_view(data, weight=None, index=None):
+    dtype = [("x", "f8"), ("y", "f8"), ("z", "f8"), ("weight", "f8"), ("index", "i8")]
     data = np.atleast_2d(data)
     array = np.empty(len(data), dtype=dtype)
     array["x"] = data[:, 0]
     array["y"] = data[:, 1]
     array["z"] = data[:, 2]
     array["weight"] = weight if weight is not None else 1.0
+    array["index"] = index if index is not None else np.arange(len(data))
     return array
 
 
@@ -79,6 +80,22 @@ def brute_force(data_weight, point_weight, radius):
     dist = euclidean_distance(data, point)
     mask = dist <= radius
     return pweight * np.sum(weight[mask])
+
+
+def brute_neighbours(data, point, k, max_dist=np.inf):
+    dist = euclidean_distance(data, point)
+    index = np.argsort(dist)
+    dist = np.sort(dist)
+    mask = dist > max_dist
+
+    result = np.empty((1, k), dtype=[("index", "i8"), ("distance", "f8")])
+    result["index"] = -1
+    result["distance"] = np.inf
+
+    n = min(k, len(data))
+    result["index"][:, :n] = np.where(mask, -1, index)[:n]
+    result["distance"][:, :n] = np.where(mask, np.inf, dist)[:n]
+    return result
 
 
 class TestBallTree:
@@ -153,7 +170,7 @@ class TestBallTree:
         # check the partitioning
         pivot_x = mock_data_median[0]
         idx_pivot = tree.num_points // 2
-        npt.assert_array_equal(tree.data[idx_pivot], data_to_view(mock_data_median))
+        npt.assert_array_equal(tree.data[idx_pivot], data_to_view(mock_data_median, index=5))
         assert np.all(tree.data[:idx_pivot]["x"] <= pivot_x)
         assert np.all(tree.data[idx_pivot + 1 :]["x"] >= pivot_x)
         # check the data elements where swapped correctly
@@ -198,11 +215,13 @@ class TestBallTree:
         high = 1.0
         size = 100000
         tree = BallTree.from_random(low, high, size)
-        data = np.array(tree.data.tolist())
+        data = tree.data
         assert len(data) == size
-        assert data.min() >= low
-        assert data.max() <= high
-        assert np.all(data[:, -1] == 1.0)
+        for coord in "xyz":
+            assert data[coord].min() >= low
+            assert data[coord].max() <= high
+        assert np.all(data["weight"] == 1.0)
+        assert np.all(np.sort(data["index"]) == np.arange(size))
 
     def test_to_from_file(self, mock_data, mock_weight, tmp_path):
         fpath = str(tmp_path / "tree.dump")
@@ -215,15 +234,66 @@ class TestBallTree:
         assert orig.count_nodes() == restored.count_nodes()
         npt.assert_array_equal(orig.data, restored.data)
 
+    @pytest.mark.parametrize("k", (1, 2, 10, 1001))
+    def test_nearest_neighbours_invalid_k(self, mock_tree, k):
+        point = (0.0, 0.0, 0.0)
+        with pytest.raises(ValueError, match="positive"):
+            mock_tree.nearest_neighbours(point, 0)
+        with pytest.raises(ValueError, match="positive"):
+            mock_tree.nearest_neighbours(point, -1)
+
+    @pytest.mark.parametrize("k", (1, 2, 10))
+    def test_nearest_neighbours_single(self, rand_data_weight, k):
+        data, _ = rand_data_weight
+        point = data[0]
+        result = BallTree(data).nearest_neighbours(point, k)
+
+        expect = brute_neighbours(data, point, k)
+        npt.assert_array_equal(result["index"], expect["index"])
+        npt.assert_almost_equal(result["distance"], expect["distance"])
+
+    def test_nearest_neighbours_k_too_long(self, rand_data_weight):
+        data, _ = rand_data_weight
+        k = len(data) + 1
+        point = data[0]
+        result = BallTree(data).nearest_neighbours(point, k)
+
+        expect = brute_neighbours(data, point, k)
+        npt.assert_array_equal(result["index"], expect["index"])
+        npt.assert_almost_equal(result["distance"], expect["distance"])
+
+    @pytest.mark.parametrize("k", (1, 2, 10))
+    def test_nearest_neighbours_multi(self, rand_data_weight, k):
+        data, _ = rand_data_weight
+        result = BallTree(data).nearest_neighbours(data, k)
+
+        expect = []
+        for p in data:
+            expect.append(brute_neighbours(data, p, k))
+        expect = np.concatenate(expect)
+        npt.assert_array_equal(result["index"], expect["index"])
+        npt.assert_almost_equal(result["distance"], expect["distance"])
+
+    @pytest.mark.parametrize("max_dist", (0.02, 0.2, 0.5))
+    def test_nearest_neighbours_max_dist(self, rand_data_weight, max_dist):
+        k = 100
+        data, _ = rand_data_weight
+        point = data[0]
+        result = BallTree(data).nearest_neighbours(point, k)
+
+        expect = brute_neighbours(data, point, k)
+        npt.assert_array_equal(result["index"], expect["index"])
+        npt.assert_almost_equal(result["distance"], expect["distance"])
+
     @pytest.mark.parametrize("radius", radius_testvalues)
     def test_brute_radius_multi(self, radius, rand_data_weight):
         data, weight = rand_data_weight
-        tree = BallTree(data, weight)
+        result = BallTree(data, weight).brute_radius(data, radius, weight)
 
-        count = 0.0
+        expect = 0.0
         for p, w in zip(data, weight):
-            count += brute_force((data, weight), (p, w), radius)
-        npt.assert_almost_equal(tree.brute_radius(data, radius, weight), count)
+            expect += brute_force((data, weight), (p, w), radius)
+        npt.assert_almost_equal(result, expect)
 
     def test_count_radius_no_radius(self, rand_data_weight):
         data, _ = rand_data_weight
@@ -235,96 +305,97 @@ class TestBallTree:
     def test_count_radius_single(self, radius, rand_data_weight):
         data, _ = rand_data_weight
         weight = np.ones(len(data))
-        tree = BallTree(data)
-
         p = data[0]
         w = 1.0
-        count = brute_force((data, weight), (p, w), radius)
-        npt.assert_almost_equal(tree.count_radius(p, radius), count)
+
+        result = BallTree(data).count_radius(p, radius)
+        expect = brute_force((data, weight), (p, w), radius)
+        npt.assert_almost_equal(result, expect)
 
     @pytest.mark.parametrize("radius", radius_testvalues)
     def test_count_radius_single_weight(self, radius, rand_data_weight):
         data, weight = rand_data_weight
-        tree = BallTree(data, weight)
-
         p = data[0]
         w = weight[0]
-        count = brute_force((data, weight), (p, w), radius)
-        npt.assert_almost_equal(tree.count_radius(p, radius, weight=w), count)
+
+        result = BallTree(data, weight).count_radius(p, radius, weight=w)
+        expect = brute_force((data, weight), (p, w), radius)
+        npt.assert_almost_equal(result, expect)
 
     @pytest.mark.parametrize("radius", radius_testvalues)
     def test_count_radius_multi(self, radius, rand_data_weight):
         data, weight = rand_data_weight
-        tree = BallTree(data, weight)
+        result = BallTree(data, weight).count_radius(data, radius, weight)
 
-        count = 0.0
+        expect = 0.0
         for p, w in zip(data, weight):
-            count += brute_force((data, weight), (p, w), radius)
-        npt.assert_almost_equal(tree.count_radius(data, radius, weight), count)
+            expect += brute_force((data, weight), (p, w), radius)
+        npt.assert_almost_equal(result, expect)
 
     @pytest.mark.parametrize("radius", radius_testvalues)
     def test_dualcount_radius(self, radius, rand_data_weight):
         data, weight = rand_data_weight
         tree = BallTree(data, weight)
 
-        count = 0.0
+        expect = 0.0
         for p, w in zip(data, weight):
-            count += brute_force((data, weight), (p, w), radius)
-        npt.assert_almost_equal(tree.dualcount_radius(tree, radius), count)
+            expect += brute_force((data, weight), (p, w), radius)
+        npt.assert_almost_equal(tree.dualcount_radius(tree, radius), expect)
 
     @pytest.mark.parametrize("rmin,rmax", rminmax_testvalues)
     def test_brute_range_multi(self, rmin, rmax, rand_data_weight):
         data, weight = rand_data_weight
-        tree = BallTree(data, weight)
+        result = BallTree(data, weight).brute_range(data, (rmin, rmax), weight)
 
         count_min = 0.0
         count_max = 0.0
         for p, w in zip(data, weight):
             count_min += brute_force((data, weight), (p, w), rmin)
             count_max += brute_force((data, weight), (p, w), rmax)
-        result = [count_min, count_max - count_min]
-        npt.assert_almost_equal(tree.brute_range(data, (rmin, rmax), weight), result)
+        expect = [count_min, count_max - count_min]
+        npt.assert_almost_equal(result, expect)
 
     def test_count_range_single_radius(self, rand_data_weight):
         data, weight = rand_data_weight
-        tree = BallTree(data, weight)
 
         p = data[0]
-        expect = [tree.count_radius(p, 0.2)]
-        npt.assert_almost_equal(tree.count_range(p, 0.2), expect)
-        npt.assert_almost_equal(tree.count_range(p, [0.2]), expect)
+        expect = [BallTree(data, weight).count_radius(p, 0.2)]
+        npt.assert_almost_equal(BallTree(data, weight).count_range(p, 0.2), expect)
+        npt.assert_almost_equal(BallTree(data, weight).count_range(p, [0.2]), expect)
 
     def test_count_range_many_radii(self, rand_data_weight):
         data, weight = rand_data_weight
-        tree = BallTree(data, weight)
-
         radii = [0.1, 0.2, 0.3, 0.4]
         p = data[0]
+
+        result = BallTree(data, weight).count_range(p, radii)
+        tree = BallTree(data, weight)
         count = [tree.count_radius(p, r) for r in radii]
         expect = np.diff(count, prepend=0.0)
-        npt.assert_almost_equal(tree.count_range(p, radii), expect)
+        npt.assert_almost_equal(result, expect)
 
     @pytest.mark.parametrize("rmin,rmax", rminmax_testvalues)
     def test_count_range_single(self, rmin, rmax, rand_data_weight):
         data, weight = rand_data_weight
-        tree = BallTree(data, weight)
-
         p = data[0]
         w = weight[0]
+
+        result = BallTree(data, weight).count_range(p, (rmin, rmax), weight=w)
         count_min = brute_force((data, weight), (p, w), rmin)
         count_max = brute_force((data, weight), (p, w), rmax)
-        result = [count_min, count_max - count_min]
-        npt.assert_almost_equal(tree.count_range(p, (rmin, rmax), weight=w), result)
+        expect = [count_min, count_max - count_min]
+        npt.assert_almost_equal(result, expect)
 
     @pytest.mark.parametrize("rmin,rmax", rminmax_testvalues)
     def test_dualcount_range(self, rmin, rmax, rand_data_weight):
         data, weight = rand_data_weight
         tree = BallTree(data, weight)
+        result = tree.dualcount_range(tree, (rmin, rmax))
 
         count_min = 0.0
         count_max = 0.0
         for p, w in zip(data, weight):
             count_min += brute_force((data, weight), (p, w), rmin)
             count_max += brute_force((data, weight), (p, w), rmax)
-        result = [count_min, count_max - count_min]
-        npt.assert_almost_equal(tree.dualcount_range(tree, (rmin, rmax)), result)
+        expect = [count_min, count_max - count_min]
+        npt.assert_almost_equal(result, expect)

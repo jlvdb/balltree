@@ -51,10 +51,10 @@ class AngularTree(BallTree):
         Build a new AngularTree instance from randomly generated points.
         
         The (ra, dec) coordinates are generated uniformly in the interval
-        [`ra_min`, `ra_max`) and [`dec_min`, `dec_max`), respectively. `size`
-        controlls the number of points generated. The optional `leafsize`
-        determines when the tree query algorithms switch from traversal to brute
-        force.
+        [``ra_min``, ``ra_max``) and [``dec_min``, ``dec_max``), respectively.
+        ``size`` controlls the number of points generated. The optional
+        ``leafsize`` determines when the tree query algorithms switch from
+        traversal to brute force.
         """
         ((x_min, y_min),) = coord.angular_to_cylinder([ra_min, dec_min])
         ((x_max, y_max),) = coord.angular_to_cylinder([ra_max, dec_max])
@@ -74,11 +74,12 @@ class AngularTree(BallTree):
             np.transpose([data["x"], data["y"], data["z"]])
         )
 
-        dtype = [("ra", "f8"), ("dec", "f8"), ("weight", "f8")]
+        dtype = [("ra", "f8"), ("dec", "f8"), ("weight", "f8"), ("index", "i8")]
         array = np.empty(len(data), dtype=dtype)
         array["ra"] = radec[:, 0]
         array["dec"] = radec[:, 1]
         array["weight"] = data["weight"]
+        array["index"] = data["index"]
         return array
 
     @property
@@ -102,7 +103,7 @@ class AngularTree(BallTree):
         center = coord.angular_to_euclidean(self.center)[0]
         radec_flat = self.data.view("f8")
         shape = (self.num_points, -1)
-        xyz = coord.angular_to_euclidean(radec_flat.reshape(shape)[:, :-1])
+        xyz = coord.angular_to_euclidean(radec_flat.reshape(shape)[:, :-2])
         # compute the maximum distance from the center project one the sphere
         diff = xyz - center[np.newaxis, :]
         dist = np.sqrt(np.sum(diff**2, axis=1))
@@ -120,14 +121,44 @@ class AngularTree(BallTree):
         """
         Collect the meta data of all tree nodes in a numpy array.
 
-        The array fields record `depth` (starting from the root node),
-        `num_points`, `sum_weight`, `x`, `y`, `z` (node center) and node `radius`.
+        The array fields record ``depth`` (starting from the root node),
+        ``num_points``, ``sum_weight``, ``x``, ``y``, ``z`` (node center) and
+        node ``radius``.
 
         .. Note::
             The node coordinates and radius are currently not converted to
             anlges.
         """
         return super().get_node_data()
+
+    def nearest_neighbours(self, radec, k, max_ang=-1.0) -> NDArray:
+        """
+        Query a fixed number of nearest neighbours.
+
+        The query point(s) ``radec`` can be a numpy array of shape (2,) or (N, 2),
+        or an equivalent python object. The number of neighbours ``k`` must be a
+        positive integer and the optional ``max_ang`` parameter puts an upper
+        bound on the angular separation (in radian) to the neighbours.
+
+        Returns an array with fields ``index``, holding the index to the neighbour
+        in the array from which the tree was constructed, and ``angle``, the
+        angular separation in radian. The result is sorted by separation,
+        missing neighbours (e.g. if ``angle > max_ang``) are indicated by an
+        index of -1 and infinite separation.
+        """
+        xyz = coord.angular_to_euclidean(radec)
+        if max_ang > 0:
+            max_dist = coord.angle_to_chorddist(max_ang)
+        else:
+            max_dist = -1.0
+        raw = super().nearest_neighbours(xyz, k, max_dist=max_dist)
+        good = raw["index"] >= 0
+
+        result = np.empty(raw.shape, dtype=[("index", "i8"), ("angle", "f8")])
+        result["index"] = raw["index"]
+        result["angle"][~good] = np.inf
+        result["angle"][good] = coord.chorddist_to_angle(raw["distance"][good])
+        return result
 
     def brute_radius(
         self,

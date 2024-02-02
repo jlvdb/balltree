@@ -55,13 +55,14 @@ def test_count_range():
     return np.diff([1, 5, 6], prepend=0.0)  # prepend is for count with itself
 
 
-def data_to_view(data, weight=True):
-    dtype = [("ra", "f8"), ("dec", "f8"), ("weight", "f8")]
+def data_to_view(data, weight=None, index=None):
+    dtype = [("ra", "f8"), ("dec", "f8"), ("weight", "f8"), ("index", "i8")]
     data = np.atleast_2d(data)
     array = np.empty(len(data), dtype=dtype)
     array["ra"] = data[:, 0]
     array["dec"] = data[:, 1]
     array["weight"] = weight if weight is not None else 1.0
+    array["index"] = index if index is not None else np.arange(len(data))
     return array
 
 
@@ -115,6 +116,17 @@ class TestAngularTree:
 
     def test_count_nodes(self, mock_data):
         assert AngularTree(mock_data, leafsize=4).count_nodes() == 3
+
+    def test_nearest_neighbours(self, mock_tree):
+        result = mock_tree.nearest_neighbours((0.0, 0.0), 5)[0]
+        npt.assert_almost_equal(result["angle"][0], 0)
+        npt.assert_almost_equal(result["angle"][1:], PI_2)
+
+    def test_nearest_neighbours_max_dist(self, mock_tree):
+        max_dist = PI_2 - 1e-9
+        result = mock_tree.nearest_neighbours((0.0, 0.0), 5, max_dist)[0]
+        npt.assert_almost_equal(result["angle"][0], 0)
+        npt.assert_almost_equal(result["angle"][1:], np.inf)
 
     def test_brute_radius(self, mock_tree, test_angles, test_count):
         point = (0.0, 0.0)

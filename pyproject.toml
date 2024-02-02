@@ -54,6 +54,7 @@ dev = [
     "black",
     "flake8",
     "pre-commit",
+    "ipykernel",
 ]
 
 [tool.setuptools.dynamic]

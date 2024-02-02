@@ -27,44 +27,13 @@ PointBuffer *ptbuf_new(int64_t size) {
         ptbuf_free(buffer);
         return NULL;
     }
+    // initialise range index
+    for (int64_t i = 0; i < size; ++i) {
+        points[i].index = i;
+    }
 
     buffer->size = size;
     buffer->points = points;
-    return buffer;
-}
-
-PointBuffer *ptbuf_from_buffers(
-    int64_t size,
-    double *x_vals,
-    double *y_vals,
-    double *z_vals
-) {
-    PointBuffer *buffer = ptbuf_new(size);
-    if (buffer == NULL) {
-        return NULL;
-    }
-    Point *points = buffer->points;
-    for (int64_t i = 0; i < size; ++i) {
-        points[i] = point_create(x_vals[i], y_vals[i], z_vals[i]);
-    }
-    return buffer;
-}
-
-PointBuffer *ptbuf_from_buffers_weighted(
-    int64_t size,
-    double *x_vals,
-    double *y_vals,
-    double *z_vals,
-    double *weights
-) {
-    PointBuffer *buffer = ptbuf_from_buffers(size, x_vals, y_vals, z_vals);
-    if (buffer == NULL) {
-        return NULL;
-    }
-    Point *points = buffer->points;
-    for (int64_t i = 0; i < size; ++i) {
-        points[i].weight = weights[i];
-    }
     return buffer;
 }
 
@@ -86,6 +55,12 @@ int ptbuf_resize(PointBuffer *buffer, int64_t size) {
     if (points == NULL) {
         EMIT_ERR_MSG(MemoryError, "PointBuffer resizing failed");
         return BTR_FAILED;
+    }
+    // update range index
+    if (size > buffer->size) {
+        for (int64_t i = buffer->size; i < size; ++i) {
+            points[i].index = i;
+        }
     }
 
     buffer->size = size;
@@ -116,10 +91,11 @@ PointBuffer *ptbuf_gen_random(double low, double high, int64_t num_points) {
     }
 
     for (int64_t i = 0; i < num_points; ++i) {
-        double x = rand_uniform(low, high);
-        double y = rand_uniform(low, high);
-        double z = rand_uniform(low, high);
-        buffer->points[i] = point_create(x, y, z);
+        Point *point = buffer->points + i;
+        point->x = rand_uniform(low, high);
+        point->y = rand_uniform(low, high);
+        point->z = rand_uniform(low, high);
+        point->weight = 1.0;
     }
     return buffer;
 }

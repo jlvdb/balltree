@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "point.h"
 #include "balltree.h"
@@ -65,6 +66,7 @@ void inputiterdata_free(InputIterData *);
 static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj);
 static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer);
 static PyObject *statvec_get_numpy_array(StatsVector *vec);
+static PyObject *queueitems_get_numpy_array(QueueItem *items, npy_intp size, npy_intp n_items);
 static DistHistogram *disthistogram_from_PyObject(PyObject *edges_obj);
 static PyObject *PyObject_from_disthistogram(DistHistogram *hist);
 static PyObject *PyBallTree_accumulate_radius(PyBallTree *self, count_radius_func accumulator, PyObject *xyz_obj, double radius, PyObject *weight_obj);
@@ -87,6 +89,7 @@ static PyObject *PyBallTree_get_radius(PyBallTree *self, void *closure);
 static PyObject *PyBallTree_str(PyObject *self);
 static PyObject *PyBallTree_to_file(PyBallTree *self, PyObject *args);
 static PyObject *PyBallTree_count_nodes(PyBallTree *self);
+static PyObject *PyBallTree_nearest_neighbours(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_get_node_data(PyBallTree *self);
 static PyObject *PyBallTree_brute_radius(PyBallTree *self, PyObject *args, PyObject *kwargs);
 static PyObject *PyBallTree_count_radius(PyBallTree *self, PyObject *args, PyObject *kwargs);
@@ -230,6 +233,7 @@ PyArrayObject *numpy_array_add_dim(PyArrayObject* array) {
     if (reshaped == NULL) {
         PyErr_SetString(PyExc_MemoryError, "failed to reshape array");
     }
+    Py_DECREF(array);
     return reshaped;
 }
 
@@ -279,7 +283,6 @@ static PyArrayObject *xyz_ensure_2dim_double(PyObject *xyz_obj) {
     npy_int ndim = PyArray_NDIM(xyz_arr);
     if (ndim == 1) {
         xyz_arr_2dim = numpy_array_add_dim(xyz_arr);
-        Py_DECREF(xyz_arr);
         if (xyz_arr_2dim == NULL) {
             return NULL;
         }
@@ -393,7 +396,12 @@ static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj
     int64_t idx = 0;
     double x, y, z;
     while (iter_get_next_xyz(data->xyz_iter, &x, &y, &z)) {
-        buffer->points[idx] = (Point){x, y, z, data->weight_buffer[idx]};
+        Point *point = buffer->points + idx;
+        point->x = x;
+        point->y = y;
+        point->z = z;
+        point->weight = data->weight_buffer[idx];
+        // index is already initialised
         ++idx;
     }
     inputiterdata_free(data);
@@ -406,11 +414,12 @@ static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer) {
 
     // construct an appropriate dtype for Point
     PyObject *arr_dtype = Py_BuildValue(
-        "[(ss)(ss)(ss)(ss)]",
+        "[(ss)(ss)(ss)(ss)(ss)]",
         "x", "f8",
         "y", "f8",
         "z", "f8",
-        "weight", "f8"
+        "weight", "f8",
+        "index", "i8"
     );
     if (arr_dtype == NULL) {
         return NULL;
@@ -494,12 +503,45 @@ static PyObject *statvec_get_numpy_array(StatsVector *vec) {
 
     // create an uninitialised array and copy the data into it
     PyObject *array = PyArray_Empty(ndim, shape, arr_descr, 0);
-    Py_DECREF(arr_descr);
     if (array == NULL) {
+        Py_DECREF(arr_descr);
         return NULL;
     }
     void *ptr = PyArray_DATA(array);
     memcpy(ptr, vec->stats, sizeof(NodeStats) * vec->size);
+    return array;
+}
+
+static PyObject *queueitems_get_numpy_array(QueueItem *items, npy_intp size, npy_intp n_items) {
+    const npy_intp ndim = 2;
+    npy_intp shape[2] = {size, n_items};
+
+    // construct an appropriate dtype for QueueItem buffer
+    PyObject *arr_dtype = Py_BuildValue(
+        "[(ss)(ss)]",
+        "index", "i8",
+        "distance", "f8"
+    );
+    if (arr_dtype == NULL) {
+        return NULL;
+    }
+
+    // get the numpy API array descriptor
+    PyArray_Descr *arr_descr;
+    int result = PyArray_DescrConverter(arr_dtype, &arr_descr);  // PyArray_Descr **
+    Py_DECREF(arr_dtype);
+    if (result != NPY_SUCCEED) {
+        return NULL;
+    }
+
+    // create an uninitialised array and copy the data into it
+    PyObject *array = PyArray_Empty(ndim, shape, arr_descr, 0);
+    if (array == NULL) {
+        Py_DECREF(arr_descr);
+        return NULL;
+    }
+    void *ptr = PyArray_DATA(array);
+    memcpy(ptr, items, sizeof(QueueItem) * size * n_items);
     return array;
 }
 
@@ -517,7 +559,7 @@ static PyObject *PyBallTree_accumulate_radius(
     // count neighbours for all inputs
     double count = 0.0;
     int64_t idx = 0;
-    Point point;
+    Point point = {0.0, 0.0, 0.0, 0.0, 0};
     while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
         point.weight = data->weight_buffer[idx];
         count += accumulator(self->balltree, &point, radius);
@@ -545,7 +587,7 @@ static PyObject *PyBallTree_accumulate_range(
     }
     // count neighbours for all inputs
     int64_t idx = 0;
-    Point point;
+    Point point = {0.0, 0.0, 0.0, 0};
     while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
         point.weight = data->weight_buffer[idx];
         accumulator(self->balltree, &point, hist);
@@ -613,8 +655,8 @@ PyDoc_STRVAR(
     "--\n\n"
     "Build a new BallTree instance from randomly generated points.\n\n"
     "The (x, y, z) coordinates are generated uniformly in the interval\n"
-    "[`low`, `high`), `size` controlls the number of points generated. The\n"
-    "optional `leafsize` determines when the tree query algorithms switch from\n"
+    "[``low``, ``high``), ``size`` controlls the number of points generated. The\n"
+    "optional ``leafsize`` determines when the tree query algorithms switch from\n"
     "traversal to brute force."
 );
 
@@ -794,7 +836,7 @@ static PyObject *PyBallTree_str(PyObject *self) {
     int n_bytes = snprintf(
         buffer,
         sizeof(buffer),
-        "BallTree(num_points=%ld, radius=%lf, center=(%lf, %lf, %lf))",
+        "BallTree(num_points=%lld, radius=%lf, center=(%lf, %lf, %lf))",
         tree->data->size,
         node->ball.radius,
         node->ball.x,
@@ -858,8 +900,9 @@ PyDoc_STRVAR(
     "get_node_data(self) -> NDArray\n"
     "--\n\n"
     "Collect the meta data of all tree nodes in a numpy array.\n\n"
-    "The array fields record `depth` (starting from the root node),\n"
-    "`num_points`, `sum_weight`, `x`, `y`, `z` (node center) and node `radius`."
+    "The array fields record ``depth`` (starting from the root node),\n"
+    "``num_points``, ``sum_weight``, ``x``, ``y``, ``z`` (node center) and node\n"
+    "``radius``."
 );
 
 static PyObject *PyBallTree_get_node_data(PyBallTree *self) {
@@ -871,6 +914,87 @@ static PyObject *PyBallTree_get_node_data(PyBallTree *self) {
     PyObject *array = statvec_get_numpy_array(vec);
     statvec_free(vec);
     return array;
+}
+
+PyDoc_STRVAR(
+    // .. py:method::
+    nearest_neighbours_doc,
+    "nearest_neighbours(self, xyz: ArrayLike, k: int, max_dist: float = -1.0) -> NDArray\n"
+    "--\n\n"
+    "Query a fixed number of nearest neighbours.\n\n"
+    "The query point(s) ``xyz`` can be a numpy array of shape (3,) or (N, 3),\n"
+    "or an equivalent python object. The number of neighbours ``k`` must be a\n"
+    "positive integer and the optional ``max_dist`` parameter puts an upper\n"
+    "bound on the separation to the neighbours.\n\n"
+    "Returns an array with fields ``index``, holding the index to the neighbour\n"
+    "in the array from which the tree was constructed, and ``distance``, the\n"
+    "separation. The result is sorted by separation, missing neighbours (e.g. if\n"
+    "``distance > max_dist``) are indicated by an index of -1 and infinite\n"
+    "separation.\n"
+);
+
+static PyObject *PyBallTree_nearest_neighbours(
+    PyBallTree *self,
+    PyObject *args,
+    PyObject *kwargs
+) {
+    static char *kwlist[] = {"xyz", "k", "max_dist", NULL};
+    PyObject *xyz_obj;
+    long num_neighbours;  // screw Windows
+    double max_dist = -1.0;
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, "Ol|d", kwlist,
+            &xyz_obj, &num_neighbours, &max_dist)
+    ) {
+        return NULL;
+    }
+    if (num_neighbours < 1) {
+        PyErr_SetString(PyExc_ValueError, "number of neighbours must be positive");
+        return NULL;
+    }
+
+    InputIterData *data = inputiterdata_new(xyz_obj, Py_None);
+    if (data == NULL) {
+        return NULL;
+    }
+
+    // allocate output buffer
+    size_t n_bytes_queue = num_neighbours * sizeof(QueueItem);
+    QueueItem *result = malloc(data->size * n_bytes_queue);
+    if (result == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "failed to allocate output array");
+        inputiterdata_free(data);
+        return NULL;
+    }
+
+    // find neighbours for all inputs
+    KnnQueue *queue = NULL;
+    PyObject *pyresult = NULL;
+    int64_t idx = 0;
+    Point point = {0.0, 0.0, 0.0, 0.0, 0};
+    while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
+        queue = balltree_nearest_neighbours(
+            self->balltree,
+            &point,
+            num_neighbours,
+            max_dist
+        );
+        if (queue == NULL) {
+            printf("oops\n");
+            goto error;
+        }
+        // copy result into output buffer
+        memcpy(&result[idx], queue->items, n_bytes_queue);
+        knque_free(queue);
+        idx += num_neighbours;
+    }
+
+    // convert to numpy array
+    pyresult = queueitems_get_numpy_array(result, data->size, num_neighbours);
+error:
+    free(result);
+    inputiterdata_free(data);
+    return pyresult;
 }
 
 PyDoc_STRVAR(
@@ -1138,6 +1262,12 @@ static PyMethodDef PyBallTree_methods[] = {
         .ml_meth = (PyCFunction)PyBallTree_get_node_data,
         .ml_flags = METH_NOARGS,
         .ml_doc = get_node_data_doc
+    },
+    {
+        .ml_name = "nearest_neighbours",
+        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_nearest_neighbours,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc = nearest_neighbours_doc
     },
     {
         .ml_name = "brute_radius",

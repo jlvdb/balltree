@@ -15,12 +15,9 @@
 
 A fast ball tree implementation for three dimensional (weighted) data with an
 Euclidean distance norm. The base implementation is in `C` and there is a
-wrapper for `Python`.
-
-The tree is optimised towards spatial correlation function calculations since
-the query routines are geared towards range queries, i.e. counting pairs with a
-given (range of) separations. Fixed number nearest neighbour search is currently
-not implemented.
+wrapper for `Python`. The tree is optimised towards spatial correlation function
+calculations since it provides fast counting routinge, e.g. by implementing a
+dualtree query algorithm.
 
 - Code: https://github.com/jlvdb/balltree.git
 - Docs: https://balltree.readthedocs.io/

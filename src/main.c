@@ -105,6 +105,16 @@ int main(int argc, char** argv) {
     count = balltree_dualcount_radius(tree2, tree2, query_radius);
     printf("self found %11.0lf pairs\n", count);
 
+    int N = 100;
+    time = clock();
+    KnnQueue *queue = balltree_nearest_neighbours(tree2, tree2->data->points, N, -1.0);
+    if (queue == NULL) {
+        return 1;
+    }
+    elapsed = (double)(clock() - time) / CLOCKS_PER_SEC * 1000.0;
+    knque_free(queue);
+    printf("found %d nearest neighbours in %7.3lf ms\n", N, elapsed);
+
     balltree_free(tree2);
     return 0;
 }

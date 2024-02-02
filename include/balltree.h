@@ -22,6 +22,7 @@ BallTree *balltree_build_leafsize(const PointBuffer *, int);
 BallTree* balltree_build_nocopy(PointBuffer *, int);
 void balltree_free(BallTree *);
 
+KnnQueue *balltree_nearest_neighbours(const BallTree *, const Point *, int64_t, double);
 double balltree_brute_radius(const BallTree *, const Point *, double);
 void balltree_brute_range(const BallTree *, const Point *, DistHistogram *);
 double balltree_count_radius(const BallTree *, const Point *, double);
