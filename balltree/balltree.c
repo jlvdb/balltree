@@ -931,12 +931,16 @@ static PyObject *PyBallTree_nearest_neighbours(
 ) {
     static char *kwlist[] = {"xyz", "k", "max_dist", NULL};
     PyObject *xyz_obj;
-    int num_neighbours;
+    long num_neighbours;  // screw Windows
     double max_dist = -1.0;
     if (!PyArg_ParseTupleAndKeywords(
-            args, kwargs, "Oi|d", kwlist,
+            args, kwargs, "Ol|d", kwlist,
             &xyz_obj, &num_neighbours, &max_dist)
     ) {
+        return NULL;
+    }
+    if (num_neighbours < 1) {
+        PyErr_SetString(PyExc_ValueError, "number of neighbours must be positive");
         return NULL;
     }
 
@@ -949,6 +953,7 @@ static PyObject *PyBallTree_nearest_neighbours(
     size_t n_bytes_queue = num_neighbours * sizeof(QueueItem);
     QueueItem *result = malloc(data->size * n_bytes_queue);
     if (result == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "failed to allocate output array");
         inputiterdata_free(data);
         return NULL;
     }
@@ -966,6 +971,7 @@ static PyObject *PyBallTree_nearest_neighbours(
             max_dist
         );
         if (queue == NULL) {
+            printf("oops\n");
             goto error;
         }
         // copy result into output buffer

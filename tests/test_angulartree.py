@@ -117,6 +117,9 @@ class TestAngularTree:
     def test_count_nodes(self, mock_data):
         assert AngularTree(mock_data, leafsize=4).count_nodes() == 3
 
+    # NOTE: nearest_neighbour doesn't need testing since it does not depende on
+    #       the choice of coordinates or the unit of the separation
+
     def test_brute_radius(self, mock_tree, test_angles, test_count):
         point = (0.0, 0.0)
         for angle, count in zip(test_angles, test_count):

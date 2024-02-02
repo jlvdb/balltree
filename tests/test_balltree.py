@@ -82,6 +82,21 @@ def brute_force(data_weight, point_weight, radius):
     return pweight * np.sum(weight[mask])
 
 
+def brute_neighbours(data, point, k, max_dist=np.inf):
+    dist = euclidean_distance(data, point)
+    index = np.argsort(dist)
+    mask = dist < max_dist
+
+    result = np.empty((1, k), dtype=[("index", "i8"), ("distance", "f8")])
+    result["index"] = -1
+    result["distance"] = np.inf
+
+    n = min(k, len(data))
+    result["index"][:, :n] = np.where(mask, index, -1)[:n]
+    result["distance"][:, :n] = np.where(mask, dist[index], np.inf)[:n]
+    return result
+
+
 class TestBallTree:
     def test_init_no_xyz(mock_data):
         with pytest.raises(TypeError):
@@ -217,6 +232,58 @@ class TestBallTree:
         assert orig.num_points == restored.num_points
         assert orig.count_nodes() == restored.count_nodes()
         npt.assert_array_equal(orig.data, restored.data)
+
+    @pytest.mark.parametrize("k", (1, 2, 10, 1001))
+    def test_nearest_neighbours_invalid_k(self, mock_tree, k):
+        point = (0.0, 0.0, 0.0)
+        with pytest.raises(ValueError, match="positive"):
+            mock_tree.nearest_neighbours(point, 0)
+        with pytest.raises(ValueError, match="positive"):
+            mock_tree.nearest_neighbours(point, -1)
+
+    @pytest.mark.parametrize("k", (1, 2, 10))
+    def test_nearest_neighbours_single(self, rand_data_weight, k):
+        data, _ = rand_data_weight
+        point = data[0]
+        result = BallTree(data).nearest_neighbours(point, k)
+
+        expect = brute_neighbours(data, point, k)
+        npt.assert_array_equal(result["index"], expect["index"])
+        npt.assert_almost_equal(result["distance"], expect["distance"])
+
+    def test_nearest_neighbours_k_too_long(self, rand_data_weight):
+        data, _ = rand_data_weight
+        k = len(data) + 1
+        point = data[0]
+        result = BallTree(data).nearest_neighbours(point, k)
+
+        expect = brute_neighbours(data, point, k)
+        npt.assert_array_equal(result["index"], expect["index"])
+        npt.assert_almost_equal(result["distance"], expect["distance"])
+
+    @pytest.mark.parametrize("k", (1, 2, 10))
+    def test_nearest_neighbours_multi(self, rand_data_weight, k):
+        data, _ = rand_data_weight
+        point = data[0]
+        result = BallTree(data).nearest_neighbours(data, k)
+
+        expect = []
+        for p in data:
+            expect.append(brute_neighbours(data, p, k))
+        expect = np.concatenate(expect)
+        npt.assert_array_equal(result["index"], expect["index"])
+        npt.assert_almost_equal(result["distance"], expect["distance"])
+
+    @pytest.mark.parametrize("max_dist", (0.02, 0.2))
+    def test_nearest_neighbours_max_dist(self, rand_data_weight, max_dist):
+        k = 100
+        data, _ = rand_data_weight
+        point = data[0]
+        result = BallTree(data).nearest_neighbours(point, k)
+
+        expect = brute_neighbours(data, point, k)
+        npt.assert_array_equal(result["index"], expect["index"])
+        npt.assert_almost_equal(result["distance"], expect["distance"])
 
     @pytest.mark.parametrize("radius", radius_testvalues)
     def test_brute_radius_multi(self, radius, rand_data_weight):
