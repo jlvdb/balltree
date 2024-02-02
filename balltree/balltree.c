@@ -504,7 +504,7 @@ static PyObject *statvec_get_numpy_array(StatsVector *vec) {
     // create an uninitialised array and copy the data into it
     PyObject *array = PyArray_Empty(ndim, shape, arr_descr, 0);
     if (array == NULL) {
-        Py_XDECREF(arr_descr);
+        Py_DECREF(arr_descr);
         return NULL;
     }
     void *ptr = PyArray_DATA(array);
@@ -537,7 +537,7 @@ static PyObject *queueitems_get_numpy_array(QueueItem *items, npy_intp size, npy
     // create an uninitialised array and copy the data into it
     PyObject *array = PyArray_Empty(ndim, shape, arr_descr, 0);
     if (array == NULL) {
-        Py_XDECREF(arr_descr);
+        Py_DECREF(arr_descr);
         return NULL;
     }
     void *ptr = PyArray_DATA(array);
@@ -655,8 +655,8 @@ PyDoc_STRVAR(
     "--\n\n"
     "Build a new BallTree instance from randomly generated points.\n\n"
     "The (x, y, z) coordinates are generated uniformly in the interval\n"
-    "[`low`, `high`), `size` controlls the number of points generated. The\n"
-    "optional `leafsize` determines when the tree query algorithms switch from\n"
+    "[``low``, ``high``), ``size`` controlls the number of points generated. The\n"
+    "optional ``leafsize`` determines when the tree query algorithms switch from\n"
     "traversal to brute force."
 );
 
@@ -900,8 +900,9 @@ PyDoc_STRVAR(
     "get_node_data(self) -> NDArray\n"
     "--\n\n"
     "Collect the meta data of all tree nodes in a numpy array.\n\n"
-    "The array fields record `depth` (starting from the root node),\n"
-    "`num_points`, `sum_weight`, `x`, `y`, `z` (node center) and node `radius`."
+    "The array fields record ``depth`` (starting from the root node),\n"
+    "``num_points``, ``sum_weight``, ``x``, ``y``, ``z`` (node center) and node\n"
+    "``radius``."
 );
 
 static PyObject *PyBallTree_get_node_data(PyBallTree *self) {
@@ -918,10 +919,18 @@ static PyObject *PyBallTree_get_node_data(PyBallTree *self) {
 PyDoc_STRVAR(
     // .. py:method::
     nearest_neighbours_doc,
-    "nearest_neighbours(self, xyz: ArrayLike, k: int, max_dist: float) -> NDArray\n"
+    "nearest_neighbours(self, xyz: ArrayLike, k: int, max_dist: float = -1.0) -> NDArray\n"
     "--\n\n"
-    "Find a number of nearest neighbours.\n\n"
-    "TODO"
+    "Query a fixed number of nearest neighbours.\n\n"
+    "The query point(s) ``xyz`` can be a numpy array of shape (3,) or (N, 3),\n"
+    "or an equivalent python object. The number of neighbours ``k`` must be a\n"
+    "positive integer and the optional ``max_dist`` parameter puts an upper\n"
+    "bound on the separation to the neighbours.\n\n"
+    "Returns an array with fields ``index``, holding the index to the neighbour\n"
+    "in the array from which the tree was constructed, and ``distance``, the\n"
+    "separation. The result is sorted by separation, missing neighbours (e.g. if\n"
+    "``distance > max_dist``) are indicated by an index of -1 and infinite\n"
+    "separation.\n"
 );
 
 static PyObject *PyBallTree_nearest_neighbours(
@@ -976,7 +985,7 @@ static PyObject *PyBallTree_nearest_neighbours(
         }
         // copy result into output buffer
         memcpy(&result[idx], queue->items, n_bytes_queue);
-        free(queue);
+        knque_free(queue);
         idx += num_neighbours;
     }
 
