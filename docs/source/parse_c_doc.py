@@ -65,7 +65,7 @@ def format_head(head: str) -> list[str]:
         line = lines.pop(0)
         options.append(line.strip("/ "))
 
-    signature = lines[-1].strip(r"\n")
+    signature = lines[-1].rstrip(r"\n")
     signature = clean_signature(signature)
 
     rst_lines = [f"{directive} {signature}"]
