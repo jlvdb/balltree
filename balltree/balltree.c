@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "point.h"
 #include "balltree.h"
@@ -65,7 +66,7 @@ void inputiterdata_free(InputIterData *);
 static PointBuffer *ptbuf_from_PyObjects(PyObject *xyz_obj, PyObject *weight_obj);
 static PyObject *ptbuf_get_numpy_view(PointBuffer *buffer);
 static PyObject *statvec_get_numpy_array(StatsVector *vec);
-static PyObject *queueitems_get_numpy_array(QueueItem *items, npy_intp size);
+static PyObject *queueitems_get_numpy_array(QueueItem *items, npy_intp size, npy_intp n_items);
 static DistHistogram *disthistogram_from_PyObject(PyObject *edges_obj);
 static PyObject *PyObject_from_disthistogram(DistHistogram *hist);
 static PyObject *PyBallTree_accumulate_radius(PyBallTree *self, count_radius_func accumulator, PyObject *xyz_obj, double radius, PyObject *weight_obj);
@@ -232,6 +233,7 @@ PyArrayObject *numpy_array_add_dim(PyArrayObject* array) {
     if (reshaped == NULL) {
         PyErr_SetString(PyExc_MemoryError, "failed to reshape array");
     }
+    Py_DECREF(array);
     return reshaped;
 }
 
@@ -281,7 +283,6 @@ static PyArrayObject *xyz_ensure_2dim_double(PyObject *xyz_obj) {
     npy_int ndim = PyArray_NDIM(xyz_arr);
     if (ndim == 1) {
         xyz_arr_2dim = numpy_array_add_dim(xyz_arr);
-        Py_DECREF(xyz_arr);
         if (xyz_arr_2dim == NULL) {
             return NULL;
         }
@@ -503,6 +504,7 @@ static PyObject *statvec_get_numpy_array(StatsVector *vec) {
     // create an uninitialised array and copy the data into it
     PyObject *array = PyArray_Empty(ndim, shape, arr_descr, 0);
     if (array == NULL) {
+        Py_XDECREF(arr_descr);
         return NULL;
     }
     void *ptr = PyArray_DATA(array);
@@ -510,9 +512,9 @@ static PyObject *statvec_get_numpy_array(StatsVector *vec) {
     return array;
 }
 
-static PyObject *queueitems_get_numpy_array(QueueItem *items, npy_intp size) {
-    const npy_intp ndim = 1;
-    npy_intp shape[1] = {size};
+static PyObject *queueitems_get_numpy_array(QueueItem *items, npy_intp size, npy_intp n_items) {
+    const npy_intp ndim = 2;
+    npy_intp shape[2] = {size, n_items};
 
     // construct an appropriate dtype for QueueItem buffer
     PyObject *arr_dtype = Py_BuildValue(
@@ -535,10 +537,11 @@ static PyObject *queueitems_get_numpy_array(QueueItem *items, npy_intp size) {
     // create an uninitialised array and copy the data into it
     PyObject *array = PyArray_Empty(ndim, shape, arr_descr, 0);
     if (array == NULL) {
+        Py_XDECREF(arr_descr);
         return NULL;
     }
     void *ptr = PyArray_DATA(array);
-    memcpy(ptr, items, sizeof(QueueItem) * size);
+    memcpy(ptr, items, sizeof(QueueItem) * size * n_items);
     return array;
 }
 
@@ -942,31 +945,39 @@ static PyObject *PyBallTree_nearest_neighbours(
         return NULL;
     }
 
+    // allocate output buffer
+    size_t n_bytes_queue = num_neighbours * sizeof(QueueItem);
+    QueueItem *result = malloc(data->size * n_bytes_queue);
+    if (result == NULL) {
+        inputiterdata_free(data);
+        return NULL;
+    }
+
     // find neighbours for all inputs
+    KnnQueue *queue = NULL;
+    PyObject *pyresult = NULL;
     int64_t idx = 0;
     Point point = {0.0, 0.0, 0.0, 0.0, 0};
-    PyObject *pyresult = NULL;
     while (iter_get_next_xyz(data->xyz_iter, &point.x, &point.y, &point.z)) {
-        if (idx > 0) {
-            PyErr_SetString(PyExc_NotImplementedError, "multiple neighbour query not yet available");
-            return NULL;
-        }
-
-        QueueItem *result = balltree_nearest_neighbours(
+        queue = balltree_nearest_neighbours(
             self->balltree,
             &point,
             num_neighbours,
             max_dist
         );
-        if (result == NULL) {
+        if (queue == NULL) {
             goto error;
         }
-        pyresult = queueitems_get_numpy_array(result, num_neighbours);
-        free(result);
-        ++idx;
+        // copy result into output buffer
+        memcpy(&result[idx], queue->items, n_bytes_queue);
+        free(queue);
+        idx += num_neighbours;
     }
 
+    // convert to numpy array
+    pyresult = queueitems_get_numpy_array(result, data->size, num_neighbours);
 error:
+    free(result);
     inputiterdata_free(data);
     return pyresult;
 }
