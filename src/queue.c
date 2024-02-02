@@ -18,7 +18,7 @@ KnnQueue *knque_new(int64_t capacity) {
         return NULL;
     }
 
-    QueueItem *items = calloc(capacity, sizeof(QueueItem));
+    QueueItem *items = malloc(capacity * sizeof(QueueItem));
     if (items == NULL) {
         EMIT_ERR_MSG(MemoryError, "KnnQueue.items allocation failed");
         knque_free(queue);
@@ -76,8 +76,7 @@ int knque_insert(KnnQueue *queue, int64_t item_index, double distance) {
     // update state of queue
     if (!queue_is_full) {
         ++(queue->size);
-    } else {
-        queue->distance_max = items[queue->size - 1].distance;
     }
+    queue->distance_max = items[queue->capacity - 1].distance;
     return 0;
 }

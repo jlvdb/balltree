@@ -68,7 +68,7 @@ void balltree_free(BallTree *tree) {
     free(tree);
 }
 
-QueueItem *balltree_nearest_neighbours(
+KnnQueue *balltree_nearest_neighbours(
     const BallTree *tree,
     const Point *point,
     int64_t num_neighbours,
@@ -82,16 +82,7 @@ QueueItem *balltree_nearest_neighbours(
         queue->distance_max = max_dist;
     }
     bnode_nearest_neighbours(tree->root, point, queue);
-
-    // copy result to new buffer
-    size_t n_bytes = num_neighbours * sizeof(QueueItem);
-    QueueItem *result = malloc(n_bytes);
-    if (result == NULL) {
-        EMIT_ERR_MSG(MemoryError, "result buffer allocation failed");
-    }
-    memcpy(result, queue->items, n_bytes);
-    knque_free(queue);
-    return result;
+    return queue;
 }
 
 double balltree_brute_radius(
