@@ -182,7 +182,7 @@ static int bnode_serialise(
     BallNode *stored = buffer->nodes + buf_idx;
     *stored = *node;
 
-    if (BALLNODE_IS_LEAF(node)) {
+    if (node->is_leaf) {
         // replace pointers to slice start/end by index into point data buffer,
         // see bnode_deserialise()
         stored->data.start = (Point *)(node->data.start - points->points);
@@ -277,7 +277,7 @@ static BallNode *bnode_deserialise(
     }
     *node = *stored;
 
-    if (BALLNODE_IS_LEAF(node)) {
+    if (node->is_leaf) {
         // restore pointers to slice start/end from their index into the point
         // data buffer, see bnode_serialise()
         node->data.start = points->points + (size_t)node->data.start;

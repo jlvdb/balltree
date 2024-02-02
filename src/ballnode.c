@@ -238,19 +238,15 @@ error:
 }
 
 void bnode_free(BallNode *node) {
-    if (!BALLNODE_IS_LEAF(node)) {
+    if (!node->is_leaf) {
         bnode_free(node->childs.left);
         bnode_free(node->childs.right);
     }
     free(node);
 }
 
-int bnode_is_leaf(const BallNode *node) {
-    return BALLNODE_IS_LEAF(node);
-}
-
 PointSlice bnode_get_ptslc(const BallNode *node) {
-    if (BALLNODE_IS_LEAF(node)) {
+    if (node->is_leaf) {
         return node->data;
     } else {
         PointSlice left = bnode_get_ptslc(node->childs.left);

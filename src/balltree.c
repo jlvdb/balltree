@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include "point.h"
-#include "histogram.h"
+#include "containers.h"
 #include "ballnode.h"
 #include "balltree.h"
 #include "balltree_macros.h"

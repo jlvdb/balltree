@@ -11,10 +11,8 @@ balltree = Extension(
     name="balltree.balltree",
     sources=[
         "balltree/balltree.c",
-        "src/point.c",
         "src/pointbuffers.c",
-        "src/histogram.c",
-        "src/queue.c",
+        "src/containers.c",
         "src/ballnode.c",
         "src/ballnode_stats.c",
         "src/ballnode_query.c",

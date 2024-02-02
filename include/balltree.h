@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "point.h"
-#include "histogram.h"
+#include "containers.h"
 #include "ballnode.h"
 
 #define DEFAULT_LEAFSIZE 20

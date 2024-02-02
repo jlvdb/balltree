@@ -4,10 +4,7 @@
 #include <stdint.h>
 
 #include "point.h"
-#include "histogram.h"
-#include "queue.h"
-
-#define BALLNODE_IS_LEAF(node) (node)->is_leaf
+#include "containers.h"
 
 typedef struct {
     double x;
@@ -54,7 +51,6 @@ typedef struct {
 // from ballnode.c
 BallNode *bnode_build(PointSlice *, int);
 void bnode_free(BallNode *);
-int bnode_is_leaf(const BallNode *);
 PointSlice bnode_get_ptslc(const BallNode *);
 
 // from ballnode_query.c

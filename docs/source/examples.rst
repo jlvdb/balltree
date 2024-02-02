@@ -15,8 +15,7 @@ Using the C library
     #include <stdio.h>
     #include <stdlib.h>
 
-    #include "point.h"     // point_create, ptbuf_gen_random
-    #include "balltree.h"  // balltree_build, balltree_count_radius
+    #include "balltree.h"
 
     int main(int argc, char** argv) {
         // uniform random points with (x, y, z) coordinates in range [-1, 1)
