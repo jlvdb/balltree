@@ -1,10 +1,14 @@
 numpy>=1.21
+# [test]
 pytest
-black
-isort
-flake8
-pre-commit
+# [docs]
 sphinx
 sphinx-design
 sphinx-copybutton
 pydata-sphinx-theme
+# [dev]
+black
+isort
+flake8
+pre-commit
+ipykernel
