@@ -44,7 +44,7 @@ void bnode_nearest_neighbours(const BallNode *node, const Point *ref_point, KnnQ
     double distance = sqrt(EUCLIDEAN_DIST_SQ(&node->ball, ref_point));
 
     // case: minimum distance to node exceeds most distant neighbour so far
-    if (queue_is_full && distance - node->ball.radius >= queue->distance_max) {
+    if (queue_is_full && distance - node->ball.radius >= knque_get_max_dist(queue)) {
         return;
     }
 

@@ -50,13 +50,12 @@ void knque_clear(KnnQueue *queue) {
 }
 
 int knque_insert(KnnQueue *queue, int64_t item_index, double distance) {
-    if (distance >= queue->distance_max) {
+    QueueItem *items = queue->items;
+    if (distance >= knque_get_max_dist(queue)) {
         return 1;  // item not in queue
     }
 
-    QueueItem *items = queue->items;
-
-    // find insertion index, note that (distance < queue->distance_max)
+    // find insertion index, note that (distance < distance_last_element)
     int64_t idx_insert = queue->size;
     while (idx_insert > 0 && distance < items[idx_insert - 1].distance) {
         --idx_insert;
@@ -77,6 +76,5 @@ int knque_insert(KnnQueue *queue, int64_t item_index, double distance) {
     if (!queue_is_full) {
         ++(queue->size);
     }
-    queue->distance_max = items[queue->capacity - 1].distance;
     return 0;
 }

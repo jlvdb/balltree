@@ -22,4 +22,10 @@ void knque_free(KnnQueue *);
 void knque_clear(KnnQueue *queue);
 int knque_insert(KnnQueue *, int64_t, double);
 
+double inline knque_get_max_dist(KnnQueue *queue) {
+    double limit = queue->distance_max;
+    double dynamic = queue->items[queue->capacity - 1].distance;
+    return (limit < dynamic) ? limit : dynamic;
+}
+
 #endif /* QUEUE_H */
