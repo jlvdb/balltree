@@ -98,7 +98,7 @@ int bnode_collect_stats(const BallNode *node, StatsVector *vec, int depth) {
 
 int64_t bnode_count_nodes(const BallNode *node) {
     int64_t count = 1;
-    if (!node->is_leaf) {
+    if (!BALLNODE_IS_LEAF(node)) {
         count += bnode_count_nodes(node->childs.left);
         count += bnode_count_nodes(node->childs.right);
     }

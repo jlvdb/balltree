@@ -112,6 +112,10 @@ PointSlice *ptslc_from_buffer(const PointBuffer *buffer) {
     return slice;
 }
 
+int64_t ptslc_get_size(const PointSlice *slice) {
+    return slice->end - slice->start;
+}
+
 double ptslc_sumw_in_radius_sq(
     const PointSlice *slice,
     const Point *ref_point,
