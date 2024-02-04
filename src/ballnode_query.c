@@ -20,9 +20,6 @@ static inline void ptslc_sumw_in_hist_sq(
 ) {
     for (const Point *point = slice->start; point < slice->end; ++point) {
         double dist_sq = EUCLIDEAN_DIST_SQ(ref_point, point);
-        // increment corresponding bin by weight
-        // TODO: improvements in ptslc_dualsumw_in_hist_sq allow to drop the
-        // multiplication with the ref_point weight
         hist_insert_dist_sq(hist, dist_sq, point->weight * ref_point->weight);
     }
 }
@@ -32,15 +29,13 @@ static inline void ptslc_dualsumw_in_hist_sq(
     const PointSlice *slice2,
     DistHistogram *hist
 ) {
-    // TODO: maybe a temporary histogram is better, scale with point weight and
-    // clear sum_weight after each iteration and add counts to the total
     for (const Point *point = slice1->start; point < slice1->end; ++point) {
         ptslc_sumw_in_hist_sq(slice2, point, hist);
     }
 }
 
 void bnode_nearest_neighbours(const BallNode *node, const Point *ref_point, KnnQueue *queue) {
-    int queue_is_full = queue->capacity == queue->size;
+    int queue_is_full = knque_is_full(queue);
     double distance = sqrt(EUCLIDEAN_DIST_SQ(&node->ball, ref_point));
 
     // case: minimum distance to node exceeds most distant neighbour so far
@@ -92,15 +87,13 @@ double bnode_count_radius(
 
     // case: node partialy overlaps with radius
     if (BALLNODE_IS_LEAF(node) == false) {
-        return bnode_count_radius(node->childs.left, point, radius) +
-                bnode_count_radius(node->childs.right, point, radius);
+        return (
+            bnode_count_radius(node->childs.left, point, radius) +
+            bnode_count_radius(node->childs.right, point, radius)
+        );
     }
     // O(n): check each pair individually
-    return point->weight * ptslc_sumw_in_radius_sq(
-        &node->data,
-        point,
-        radius * radius
-    );
+    return point->weight * ptslc_sumw_in_radius_sq(&node->data, point, radius * radius);
 }
 
 void bnode_count_range(
@@ -162,30 +155,32 @@ double bnode_dualcount_radius(
 
     // case: both nodes can be traversed further
     if (node1_is_leaf == false && node2_is_leaf == false) {
-        return bnode_dualcount_radius(node1->childs.left, node2->childs.left, radius) +
-                bnode_dualcount_radius(node1->childs.left, node2->childs.right, radius) +
-                bnode_dualcount_radius(node1->childs.right, node2->childs.left, radius) +
-                bnode_dualcount_radius(node1->childs.right, node2->childs.right, radius);
+        return (
+            bnode_dualcount_radius(node1->childs.left, node2->childs.left, radius) +
+            bnode_dualcount_radius(node1->childs.left, node2->childs.right, radius) +
+            bnode_dualcount_radius(node1->childs.right, node2->childs.left, radius) +
+            bnode_dualcount_radius(node1->childs.right, node2->childs.right, radius)
+        );
     }
 
     // case: node1 can be traversed further
     else if (node1_is_leaf == false) {
-        return bnode_dualcount_radius(node1->childs.left, node2, radius) +
-                bnode_dualcount_radius(node1->childs.right, node2, radius);
+        return (
+            bnode_dualcount_radius(node1->childs.left, node2, radius) +
+            bnode_dualcount_radius(node1->childs.right, node2, radius)
+        );
     }
 
     // case: node2 can be traversed further
     else if (node2_is_leaf == false) {
-        return bnode_dualcount_radius(node1, node2->childs.left, radius) +
-                bnode_dualcount_radius(node1, node2->childs.right, radius);
+        return (
+            bnode_dualcount_radius(node1, node2->childs.left, radius) +
+            bnode_dualcount_radius(node1, node2->childs.right, radius)
+        );
     }
 
     // O(n^2): check pairs formed between points of both nodes individually
-    return ptslc_dualsumw_in_radius_sq(
-        &node1->data,
-        &node2->data,
-        radius * radius
-    );
+    return ptslc_dualsumw_in_radius_sq(&node1->data, &node2->data, radius * radius);
 }
 
 void bnode_dualcount_range(

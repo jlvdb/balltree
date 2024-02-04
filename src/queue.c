@@ -63,7 +63,7 @@ int knque_insert(KnnQueue *queue, int64_t item_index, double distance) {
     // very first if statement guarantees (idx_insert < queue->capacity)
 
     // make room and insert item, drop last item if at capacity
-    int queue_is_full = queue->size == queue->capacity;
+    int queue_is_full = knque_is_full(queue);
     int64_t idx = queue_is_full ? (queue->capacity - 1) : queue->size;
     while (idx > idx_insert) {
         items[idx] = items[idx - 1];
