@@ -467,7 +467,7 @@ static PyObject *PyObject_from_disthistogram(DistHistogram *hist) {
     if (pycount == NULL) {
         return NULL;
     }
-    double *count_buffer = PyArray_DATA(pycount);
+    double *count_buffer = PyArray_DATA((PyArrayObject *)pycount);
     for (int64_t i = 0; i < hist->size; ++i) {
         count_buffer[i] = hist->sum_weight[i];
     }
@@ -507,7 +507,7 @@ static PyObject *statvec_get_numpy_array(StatsVector *vec) {
         Py_DECREF(arr_descr);
         return NULL;
     }
-    void *ptr = PyArray_DATA(array);
+    void *ptr = PyArray_DATA((PyArrayObject * )array);
     memcpy(ptr, vec->stats, sizeof(NodeStats) * vec->size);
     return array;
 }
@@ -540,7 +540,7 @@ static PyObject *queueitems_get_numpy_array(QueueItem *items, npy_intp size, npy
         Py_DECREF(arr_descr);
         return NULL;
     }
-    void *ptr = PyArray_DATA(array);
+    void *ptr = PyArray_DATA((PyArrayObject *)array);
     memcpy(ptr, items, sizeof(QueueItem) * size * n_items);
     return array;
 }
@@ -1234,7 +1234,7 @@ static PyMethodDef PyBallTree_methods[] = {
     // constructors
     {
         .ml_name = "from_random",
-        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_from_random,
+        .ml_meth = (PyCFunction)PyBallTree_from_random,
         .ml_flags = METH_CLASS | METH_VARARGS | METH_KEYWORDS,
         .ml_doc = from_random_doc
     },
@@ -1265,19 +1265,19 @@ static PyMethodDef PyBallTree_methods[] = {
     },
     {
         .ml_name = "nearest_neighbours",
-        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_nearest_neighbours,
+        .ml_meth = (PyCFunction)PyBallTree_nearest_neighbours,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
         .ml_doc = nearest_neighbours_doc
     },
     {
         .ml_name = "brute_radius",
-        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_brute_radius,
+        .ml_meth = (PyCFunction)PyBallTree_brute_radius,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
         .ml_doc = brute_radius_doc
     },
     {
         .ml_name = "count_radius",
-        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_radius,
+        .ml_meth = (PyCFunction)PyBallTree_count_radius,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
         .ml_doc = count_radius_doc
     },
@@ -1289,13 +1289,13 @@ static PyMethodDef PyBallTree_methods[] = {
     },
     {
         .ml_name = "brute_range",
-        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_brute_range,
+        .ml_meth = (PyCFunction)PyBallTree_brute_range,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
         .ml_doc = brute_range_doc
     },
     {
         .ml_name = "count_range",
-        .ml_meth = (PyCFunctionWithKeywords)PyBallTree_count_range,
+        .ml_meth = (PyCFunction)PyBallTree_count_range,
         .ml_flags = METH_VARARGS | METH_KEYWORDS,
         .ml_doc = count_range_doc
     },
