@@ -28,9 +28,9 @@ classifiers = [
     "Operating System :: Unix",
     "Operating System :: MacOS",
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 dependencies = [
-    "numpy>=1.21",
+    "numpy>=2.0",
 ]
 
 [project.urls]
